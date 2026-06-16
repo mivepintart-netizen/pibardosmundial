@@ -1,0 +1,813 @@
+// ============================================================
+// app.js — Mundial 2026 Bet Tracker — Application Logic
+// ============================================================
+
+(function () {
+  "use strict";
+
+  // ---- Constants ----
+  const STORAGE_KEY = "mundial2026_tracker";
+
+  // ---- State ----
+  let state = loadState();
+  let currentFilter = "all";
+  let editingBetId = null;
+  let openDropdownId = null;
+
+  // ---- DOM Refs ----
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  const dom = {
+    // Stats
+    statBote: $("#stat-bote"),
+    statBoteSub: $("#stat-bote-sub"),
+    statActual: $("#stat-actual"),
+    statActualSub: $("#stat-actual-sub"),
+    statBalance: $("#stat-balance"),
+    statBalanceSub: $("#stat-balance-sub"),
+    statBalanceCard: $("#stat-balance-card"),
+    statAcierto: $("#stat-acierto"),
+    statAciertoSub: $("#stat-acierto-sub"),
+
+    // Balance bar
+    barLost: $("#bar-lost"),
+    barWon: $("#bar-won"),
+    barAvailable: $("#bar-available"),
+    barFillSpent: $("#bar-fill-spent"),
+    barFillWon: $("#bar-fill-won"),
+    barFillRemaining: $("#bar-fill-remaining"),
+
+    // Lists
+    betsList: $("#bets-list"),
+    betCount: $("#bet-count"),
+    participantsGrid: $("#participants-grid"),
+
+    // Filters
+    filterGroup: $("#filter-group"),
+
+    // Add/Edit Modal
+    modalOverlay: $("#modal-overlay"),
+    modalTitle: $("#modal-title"),
+    modalClose: $("#modal-close"),
+    betForm: $("#bet-form"),
+    inputId: $("#input-id"),
+    inputPartido: $("#input-partido"),
+    inputApuesta: $("#input-apuesta"),
+    inputCuota: $("#input-cuota"),
+    inputImporte: $("#input-importe"),
+    inputEstado: $("#input-estado"),
+    previewGanancia: $("#preview-ganancia"),
+    btnCancel: $("#btn-cancel"),
+    btnSubmit: $("#btn-submit"),
+
+    // Share Modal
+    shareOverlay: $("#share-overlay"),
+    shareClose: $("#share-close"),
+    shareMessage: $("#share-message"),
+    btnCopy: $("#btn-copy"),
+    btnWhatsapp: $("#btn-whatsapp"),
+
+    // Buttons
+    btnAdd: $("#btn-add"),
+    btnShare: $("#btn-share"),
+    btnExport: $("#btn-export"),
+    btnImport: $("#btn-import"),
+    btnReset: $("#btn-reset"),
+    importFile: $("#import-file"),
+
+    // Toast
+    toast: $("#toast"),
+    toastIcon: $("#toast-icon"),
+    toastMessage: $("#toast-message"),
+  };
+
+  // ---- Initialize ----
+  function init() {
+    renderAll();
+    bindEvents();
+  }
+
+  // ---- State Management ----
+  function loadState() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn("Error loading state:", e);
+    }
+    // Return deep copy of initial data
+    return JSON.parse(JSON.stringify(INITIAL_DATA));
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.warn("Error saving state:", e);
+    }
+  }
+
+  // ---- Calculations ----
+  function calcStats() {
+    const apuestas = state.apuestas;
+    const resueltas = apuestas.filter(
+      (a) => a.estado === "ganada" || a.estado === "perdida"
+    );
+    const ganadas = apuestas.filter((a) => a.estado === "ganada");
+    const perdidas = apuestas.filter((a) => a.estado === "perdida");
+    const pendientes = apuestas.filter((a) => a.estado === "pendiente");
+
+    const totalApostado = resueltas.reduce((sum, a) => sum + a.importe, 0);
+    const totalGanado = ganadas.reduce((sum, a) => sum + a.posibleGanancia, 0);
+    const totalPerdido = perdidas.reduce((sum, a) => sum + a.importe, 0);
+    const totalPendiente = pendientes.reduce((sum, a) => sum + a.importe, 0);
+
+    // Net profit from resolved bets = money won minus money lost
+    const netProfit = totalGanado - totalPerdido;
+
+    // Dinero actual = bote + profit from wins - losses
+    // = boteInicial - totalPerdido + (totalGanado - ganadas stakes)
+    // Actually: dineroActual = boteInicial - totalPerdido + totalGanado - ganadas.stakes
+    // Wait, let me think again.
+    // bote starts at boteInicial
+    // For each lost bet: bote -= importe (we lose the stake)
+    // For each won bet: bote -= importe (we pay the stake) but bote += posibleGanancia (we receive winnings)
+    // So: dineroActual = boteInicial - sum(all resolved stakes) + sum(won returns)
+    const totalResolvedStakes = resueltas.reduce(
+      (sum, a) => sum + a.importe,
+      0
+    );
+    const dineroActual =
+      state.boteInicial - totalResolvedStakes + totalGanado - totalPendiente;
+
+    // Actually, pendientes shouldn't affect dinero actual until resolved
+    // Let me recalculate:
+    // dineroActual = boteInicial - perdidas.stakes - ganadas.stakes + ganadas.returns
+    // = boteInicial - totalPerdido - ganadas.stakes + totalGanado
+    const ganadasStakes = ganadas.reduce((sum, a) => sum + a.importe, 0);
+    const dineroActualCorrected =
+      state.boteInicial - totalPerdido - ganadasStakes + totalGanado;
+
+    const balance = dineroActualCorrected - state.boteInicial;
+
+    const pctAcierto =
+      resueltas.length > 0
+        ? Math.round((ganadas.length / resueltas.length) * 100)
+        : 0;
+
+    const numParticipantes = state.participantes.length;
+    const aRepartir =
+      numParticipantes > 0
+        ? dineroActualCorrected / numParticipantes
+        : 0;
+
+    return {
+      boteInicial: state.boteInicial,
+      dineroActual: dineroActualCorrected,
+      balance,
+      pctAcierto,
+      totalGanadas: ganadas.length,
+      totalPerdidas: perdidas.length,
+      totalPendientes: pendientes.length,
+      totalResueltas: resueltas.length,
+      totalApuestas: apuestas.length,
+      totalGanado,
+      totalPerdido,
+      totalPendiente,
+      ganadasStakes,
+      aRepartir,
+      numParticipantes,
+    };
+  }
+
+  // ---- Formatting ----
+  function formatEuro(amount) {
+    return new Intl.NumberFormat("es-ES", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: 2,
+    }).format(amount);
+  }
+
+  function formatEuroShort(amount) {
+    return (
+      amount.toLocaleString("es-ES", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }) + " €"
+    );
+  }
+
+  // ---- Render Functions ----
+  function renderAll() {
+    renderStats();
+    renderBalanceBar();
+    renderBets();
+    renderParticipants();
+  }
+
+  function renderStats() {
+    const s = calcStats();
+
+    dom.statBote.textContent = formatEuro(s.boteInicial);
+    dom.statBoteSub.textContent = `${s.numParticipantes} participantes`;
+
+    dom.statActual.textContent = formatEuro(s.dineroActual);
+    dom.statActualSub.textContent = `en el bote`;
+
+    dom.statBalance.textContent =
+      (s.balance >= 0 ? "+" : "") + formatEuro(s.balance);
+    dom.statBalanceSub.textContent = `desde el inicio`;
+    dom.statBalanceCard.classList.toggle("negative", s.balance < 0);
+
+    dom.statAcierto.textContent = s.pctAcierto + "%";
+    dom.statAciertoSub.textContent = `${s.totalGanadas} de ${s.totalResueltas} resueltas`;
+  }
+
+  function renderBalanceBar() {
+    const s = calcStats();
+    const total = s.boteInicial + s.totalGanado;
+
+    // Proportions relative to total money that has "passed through"
+    const pctLost = total > 0 ? (s.totalPerdido / total) * 100 : 0;
+    const pctWon = total > 0 ? (s.totalGanado / total) * 100 : 0;
+    const pctRemaining = Math.max(0, 100 - pctLost - pctWon);
+
+    dom.barFillSpent.style.width = pctLost + "%";
+    dom.barFillWon.style.width = pctWon + "%";
+    dom.barFillRemaining.style.width = pctRemaining + "%";
+
+    dom.barLost.textContent = formatEuroShort(s.totalPerdido);
+    dom.barWon.textContent = formatEuroShort(s.totalGanado);
+    dom.barAvailable.textContent = formatEuroShort(
+      Math.max(0, s.dineroActual)
+    );
+  }
+
+  function renderBets() {
+    const filtered =
+      currentFilter === "all"
+        ? state.apuestas
+        : state.apuestas.filter((a) => a.estado === currentFilter);
+
+    if (filtered.length === 0) {
+      dom.betsList.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">⚽</div>
+          <div class="empty-state-text">
+            ${
+              currentFilter === "all"
+                ? "No hay apuestas todavía. ¡Añade la primera!"
+                : `No hay apuestas ${
+                    currentFilter === "ganada"
+                      ? "ganadas"
+                      : currentFilter === "perdida"
+                      ? "perdidas"
+                      : "pendientes"
+                  }`
+            }
+          </div>
+        </div>`;
+      dom.betCount.textContent = "0 apuestas";
+      return;
+    }
+
+    // Show most recent first
+    const sorted = [...filtered].reverse();
+
+    dom.betsList.innerHTML = sorted
+      .map(
+        (bet, idx) => `
+      <div class="bet-card ${bet.estado}" data-id="${bet.id}" style="animation-delay: ${idx * 0.04}s">
+        <div class="bet-status-badge ${bet.estado}" data-id="${bet.id}" title="Cambiar estado">
+          ${statusEmoji(bet.estado)}
+          <div class="status-dropdown" id="dropdown-${bet.id}">
+            <div class="status-option" data-estado="pendiente" data-id="${bet.id}">⏳ Pendiente</div>
+            <div class="status-option" data-estado="ganada" data-id="${bet.id}">✅ Ganada</div>
+            <div class="status-option" data-estado="perdida" data-id="${bet.id}">❌ Perdida</div>
+          </div>
+        </div>
+        <div class="bet-info">
+          <div class="bet-match">${escapeHtml(bet.partido)}</div>
+          <div class="bet-type">${escapeHtml(bet.apuesta)}</div>
+        </div>
+        <div class="bet-numbers">
+          <div class="bet-amount">${formatEuroShort(bet.importe)}</div>
+          <div class="bet-odds">× ${bet.cuota.toFixed(2)}</div>
+        </div>
+        <div class="bet-result">
+          <div class="bet-potential">${
+            bet.estado === "perdida"
+              ? "-" + formatEuroShort(bet.importe)
+              : bet.estado === "ganada"
+              ? "+" + formatEuroShort(bet.posibleGanancia - bet.importe)
+              : formatEuroShort(bet.posibleGanancia)
+          }</div>
+          <div class="bet-result-label">${
+            bet.estado === "pendiente"
+              ? "posible"
+              : bet.estado === "ganada"
+              ? "ganancia"
+              : "perdido"
+          }</div>
+        </div>
+        <div class="bet-actions">
+          <button class="btn-icon" onclick="app.editBet(${bet.id})" title="Editar">✏️</button>
+          <button class="btn-icon" onclick="app.deleteBet(${bet.id})" title="Eliminar">🗑️</button>
+        </div>
+      </div>`
+      )
+      .join("");
+
+    const countText =
+      currentFilter === "all"
+        ? `${filtered.length} apuestas`
+        : `${filtered.length} de ${state.apuestas.length}`;
+    dom.betCount.textContent = countText;
+  }
+
+  function renderParticipants() {
+    const s = calcStats();
+
+    dom.participantsGrid.innerHTML = state.participantes
+      .map(
+        (p, idx) => `
+      <div class="participant-card">
+        <div class="participant-avatar avatar-${(idx % 9) + 1}">
+          ${p.nombre.charAt(0).toUpperCase()}
+        </div>
+        <div class="participant-name">${escapeHtml(p.nombre)}</div>
+        <div class="participant-stats">
+          <div class="participant-stat">
+            <span class="participant-stat-label">Aportó</span>
+            <span class="participant-stat-value">${formatEuroShort(
+              p.aportacion
+            )}</span>
+          </div>
+          <div class="participant-stat">
+            <span class="participant-stat-label">A repartir</span>
+            <span class="participant-stat-value ${
+              s.aRepartir >= p.aportacion ? "positive" : "negative"
+            }">${formatEuroShort(s.aRepartir)}</span>
+          </div>
+          <div class="participant-stat">
+            <span class="participant-stat-label">Balance</span>
+            <span class="participant-stat-value ${
+              s.aRepartir - p.aportacion >= 0 ? "positive" : "negative"
+            }">${
+          s.aRepartir - p.aportacion >= 0 ? "+" : ""
+        }${formatEuroShort(s.aRepartir - p.aportacion)}</span>
+          </div>
+        </div>
+      </div>`
+      )
+      .join("");
+  }
+
+  // ---- Helpers ----
+  function statusEmoji(estado) {
+    switch (estado) {
+      case "ganada":
+        return "✅";
+      case "perdida":
+        return "❌";
+      case "pendiente":
+        return "⏳";
+      default:
+        return "❓";
+    }
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function getNextId() {
+    return state.apuestas.length > 0
+      ? Math.max(...state.apuestas.map((a) => a.id)) + 1
+      : 1;
+  }
+
+  // ---- Event Binding ----
+  function bindEvents() {
+    // Add bet button
+    dom.btnAdd.addEventListener("click", () => openAddModal());
+
+    // Close modals
+    dom.modalClose.addEventListener("click", () => closeModal());
+    dom.btnCancel.addEventListener("click", () => closeModal());
+    dom.modalOverlay.addEventListener("click", (e) => {
+      if (e.target === dom.modalOverlay) closeModal();
+    });
+
+    dom.shareClose.addEventListener("click", () => closeShareModal());
+    dom.shareOverlay.addEventListener("click", (e) => {
+      if (e.target === dom.shareOverlay) closeShareModal();
+    });
+
+    // Form input preview
+    dom.inputCuota.addEventListener("input", updatePreview);
+    dom.inputImporte.addEventListener("input", updatePreview);
+
+    // Form submit
+    dom.betForm.addEventListener("submit", handleFormSubmit);
+
+    // Filters
+    dom.filterGroup.addEventListener("click", (e) => {
+      const btn = e.target.closest(".filter-btn");
+      if (!btn) return;
+      $$(".filter-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentFilter = btn.dataset.filter;
+      renderBets();
+    });
+
+    // Status badge clicks (event delegation on bets list)
+    dom.betsList.addEventListener("click", (e) => {
+      // Status badge
+      const badge = e.target.closest(".bet-status-badge");
+      if (badge && !e.target.closest(".status-option")) {
+        e.stopPropagation();
+        const id = parseInt(badge.dataset.id);
+        toggleStatusDropdown(id);
+        return;
+      }
+
+      // Status option
+      const option = e.target.closest(".status-option");
+      if (option) {
+        e.stopPropagation();
+        const id = parseInt(option.dataset.id);
+        const estado = option.dataset.estado;
+        changeStatus(id, estado);
+        return;
+      }
+    });
+
+    // Close dropdowns on outside click
+    document.addEventListener("click", () => {
+      closeAllDropdowns();
+    });
+
+    // Share button
+    dom.btnShare.addEventListener("click", openShareModal);
+
+    // Share actions
+    dom.btnCopy.addEventListener("click", copyShareMessage);
+    dom.btnWhatsapp.addEventListener("click", sendWhatsApp);
+
+    // Data management
+    dom.btnExport.addEventListener("click", exportData);
+    dom.btnImport.addEventListener("click", () => dom.importFile.click());
+    dom.importFile.addEventListener("change", importData);
+    dom.btnReset.addEventListener("click", resetData);
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeModal();
+        closeShareModal();
+        closeAllDropdowns();
+      }
+    });
+  }
+
+  // ---- Modal Functions ----
+  function openAddModal() {
+    editingBetId = null;
+    dom.modalTitle.textContent = "Nueva Apuesta";
+    dom.btnSubmit.textContent = "💾 Guardar";
+    dom.betForm.reset();
+    dom.inputEstado.value = "pendiente";
+    dom.previewGanancia.textContent = "0,00 €";
+    dom.modalOverlay.classList.add("active");
+  }
+
+  function openEditModal(bet) {
+    editingBetId = bet.id;
+    dom.modalTitle.textContent = "Editar Apuesta";
+    dom.btnSubmit.textContent = "💾 Actualizar";
+    dom.inputPartido.value = bet.partido;
+    dom.inputApuesta.value = bet.apuesta;
+    dom.inputCuota.value = bet.cuota;
+    dom.inputImporte.value = bet.importe;
+    dom.inputEstado.value = bet.estado;
+    updatePreview();
+    dom.modalOverlay.classList.add("active");
+  }
+
+  function closeModal() {
+    dom.modalOverlay.classList.remove("active");
+    editingBetId = null;
+  }
+
+  function updatePreview() {
+    const cuota = parseFloat(dom.inputCuota.value) || 0;
+    const importe = parseFloat(dom.inputImporte.value) || 0;
+    const ganancia = cuota * importe;
+    dom.previewGanancia.textContent = formatEuroShort(ganancia);
+  }
+
+  function handleFormSubmit(e) {
+    e.preventDefault();
+
+    const partido = dom.inputPartido.value.trim();
+    const apuesta = dom.inputApuesta.value.trim();
+    const cuota = parseFloat(dom.inputCuota.value);
+    const importe = parseFloat(dom.inputImporte.value);
+    const estado = dom.inputEstado.value;
+    const posibleGanancia = Math.round(cuota * importe * 100) / 100;
+
+    if (!partido || !apuesta || isNaN(cuota) || isNaN(importe)) {
+      showToast("⚠️", "Rellena todos los campos", "error");
+      return;
+    }
+
+    if (editingBetId !== null) {
+      // Edit existing bet
+      const idx = state.apuestas.findIndex((a) => a.id === editingBetId);
+      if (idx !== -1) {
+        state.apuestas[idx] = {
+          ...state.apuestas[idx],
+          partido,
+          apuesta,
+          cuota,
+          importe,
+          posibleGanancia,
+          estado,
+        };
+        showToast("✅", "Apuesta actualizada", "success");
+      }
+    } else {
+      // Add new bet
+      state.apuestas.push({
+        id: getNextId(),
+        partido,
+        apuesta,
+        cuota,
+        importe,
+        posibleGanancia,
+        estado,
+      });
+      showToast("✅", "Apuesta añadida", "success");
+    }
+
+    saveState();
+    renderAll();
+    closeModal();
+  }
+
+  // ---- Status Management ----
+  function toggleStatusDropdown(id) {
+    closeAllDropdowns();
+    const dropdown = $(`#dropdown-${id}`);
+    if (dropdown) {
+      dropdown.classList.add("show");
+      openDropdownId = id;
+    }
+  }
+
+  function closeAllDropdowns() {
+    $$(".status-dropdown.show").forEach((d) => d.classList.remove("show"));
+    openDropdownId = null;
+  }
+
+  function changeStatus(id, newEstado) {
+    const bet = state.apuestas.find((a) => a.id === id);
+    if (bet) {
+      const oldEstado = bet.estado;
+      bet.estado = newEstado;
+      saveState();
+      renderAll();
+      closeAllDropdowns();
+
+      const labels = {
+        ganada: "ganada ✅",
+        perdida: "perdida ❌",
+        pendiente: "pendiente ⏳",
+      };
+      showToast(
+        "🔄",
+        `${bet.partido}: ${labels[newEstado]}`,
+        newEstado === "ganada"
+          ? "success"
+          : newEstado === "perdida"
+          ? "error"
+          : "info"
+      );
+    }
+  }
+
+  // ---- Bet CRUD ----
+  window.app = {
+    editBet(id) {
+      const bet = state.apuestas.find((a) => a.id === id);
+      if (bet) openEditModal(bet);
+    },
+
+    deleteBet(id) {
+      const bet = state.apuestas.find((a) => a.id === id);
+      if (!bet) return;
+
+      if (confirm(`¿Eliminar la apuesta "${bet.apuesta}" de ${bet.partido}?`)) {
+        // Animate removal
+        const card = $(`.bet-card[data-id="${id}"]`);
+        if (card) {
+          card.classList.add("removing");
+          setTimeout(() => {
+            state.apuestas = state.apuestas.filter((a) => a.id !== id);
+            saveState();
+            renderAll();
+            showToast("🗑️", "Apuesta eliminada", "info");
+          }, 300);
+        } else {
+          state.apuestas = state.apuestas.filter((a) => a.id !== id);
+          saveState();
+          renderAll();
+          showToast("🗑️", "Apuesta eliminada", "info");
+        }
+      }
+    },
+  };
+
+  // ---- Share Functions ----
+  function generateShareMessage(lastBet) {
+    const s = calcStats();
+    const ganadas = state.apuestas.filter((a) => a.estado === "ganada");
+    const perdidas = state.apuestas.filter((a) => a.estado === "perdida");
+
+    let msg = `🏆 *MUNDIAL 2026 — Actualización de Apuestas*\n\n`;
+    msg += `📊 *Resumen:*\n`;
+    msg += `💰 Bote inicial: ${formatEuroShort(s.boteInicial)}\n`;
+    msg += `💵 Dinero actual: ${formatEuroShort(s.dineroActual)}\n`;
+    msg += `${s.balance >= 0 ? "📈" : "📉"} Balance: ${s.balance >= 0 ? "+" : ""}${formatEuroShort(s.balance)}\n`;
+    msg += `🎯 Aciertos: ${s.totalGanadas}/${s.totalResueltas} (${s.pctAcierto}%)\n`;
+    msg += `\n`;
+
+    if (lastBet) {
+      msg += `🆕 *Última apuesta:*\n`;
+      msg += `⚽ ${lastBet.partido}\n`;
+      msg += `🎲 ${lastBet.apuesta} → Cuota ${lastBet.cuota.toFixed(2)}\n`;
+      msg += `💸 Apostado: ${formatEuroShort(lastBet.importe)} → Posible: ${formatEuroShort(lastBet.posibleGanancia)}\n`;
+      msg += `${statusEmoji(lastBet.estado)} ${lastBet.estado.toUpperCase()}\n`;
+      msg += `\n`;
+    }
+
+    // Recent results (last 5 resolved)
+    const recentResolved = [...state.apuestas]
+      .filter((a) => a.estado !== "pendiente")
+      .slice(-5)
+      .reverse();
+
+    if (recentResolved.length > 0) {
+      msg += `📋 *Últimas resueltas:*\n`;
+      recentResolved.forEach((a) => {
+        msg += `${statusEmoji(a.estado)} ${a.partido} — ${a.apuesta} (${formatEuroShort(a.importe)})\n`;
+      });
+      msg += `\n`;
+    }
+
+    // Pending bets
+    const pendientes = state.apuestas.filter((a) => a.estado === "pendiente");
+    if (pendientes.length > 0) {
+      msg += `⏳ *Pendientes (${pendientes.length}):*\n`;
+      pendientes.forEach((a) => {
+        msg += `• ${a.partido} — ${a.apuesta} (${formatEuroShort(a.importe)})\n`;
+      });
+      msg += `\n`;
+    }
+
+    msg += `👥 A repartir por persona: ${formatEuroShort(s.aRepartir)}\n`;
+
+    return msg;
+  }
+
+  function openShareModal() {
+    // Use the most recent bet as "last bet"
+    const lastBet = state.apuestas.length > 0
+      ? state.apuestas[state.apuestas.length - 1]
+      : null;
+    const msg = generateShareMessage(lastBet);
+    dom.shareMessage.textContent = msg;
+    dom.shareOverlay.classList.add("active");
+  }
+
+  function closeShareModal() {
+    dom.shareOverlay.classList.remove("active");
+  }
+
+  function copyShareMessage() {
+    const text = dom.shareMessage.textContent;
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        showToast("📋", "Mensaje copiado al portapapeles", "success");
+      })
+      .catch(() => {
+        // Fallback
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        showToast("📋", "Mensaje copiado", "success");
+      });
+  }
+
+  function sendWhatsApp() {
+    const text = dom.shareMessage.textContent;
+    const encoded = encodeURIComponent(text);
+    // wa.me without phone number opens WhatsApp with the message to choose a contact/group
+    window.open(`https://wa.me/?text=${encoded}`, "_blank");
+    showToast("📱", "Abriendo WhatsApp...", "success");
+  }
+
+  // ---- Data Management ----
+  function exportData() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mundial2026_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("📥", "Datos exportados", "success");
+  }
+
+  function importData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (event) {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (
+          data.boteInicial !== undefined &&
+          data.participantes &&
+          data.apuestas
+        ) {
+          state = data;
+          saveState();
+          renderAll();
+          showToast("📤", "Datos importados correctamente", "success");
+        } else {
+          showToast("⚠️", "Formato de archivo no válido", "error");
+        }
+      } catch (err) {
+        showToast("⚠️", "Error al leer el archivo", "error");
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    e.target.value = "";
+  }
+
+  function resetData() {
+    if (
+      confirm(
+        "¿Estás seguro? Esto resetará todos los datos a los valores originales del Excel."
+      )
+    ) {
+      state = JSON.parse(JSON.stringify(INITIAL_DATA));
+      saveState();
+      renderAll();
+      showToast("🔄", "Datos reseteados", "info");
+    }
+  }
+
+  // ---- Toast ----
+  let toastTimeout = null;
+  function showToast(icon, message, type = "info") {
+    if (toastTimeout) clearTimeout(toastTimeout);
+
+    dom.toast.className = `toast ${type}`;
+    dom.toastIcon.textContent = icon;
+    dom.toastMessage.textContent = message;
+
+    // Force reflow
+    dom.toast.offsetHeight;
+    dom.toast.classList.add("show");
+
+    toastTimeout = setTimeout(() => {
+      dom.toast.classList.remove("show");
+    }, 3000);
+  }
+
+  // ---- Boot ----
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
