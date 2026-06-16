@@ -152,38 +152,19 @@
     const perdidas = apuestas.filter((a) => a.estado === "perdida");
     const pendientes = apuestas.filter((a) => a.estado === "pendiente");
 
-    const totalApostado = resueltas.reduce((sum, a) => sum + a.importe, 0);
     const totalGanado = ganadas.reduce((sum, a) => sum + a.posibleGanancia, 0);
     const totalPerdido = perdidas.reduce((sum, a) => sum + a.importe, 0);
     const totalPendiente = pendientes.reduce((sum, a) => sum + a.importe, 0);
-
-    // Net profit from resolved bets = money won minus money lost
-    const netProfit = totalGanado - totalPerdido;
-
-    // Dinero actual = bote + profit from wins - losses
-    // = boteInicial - totalPerdido + (totalGanado - ganadas stakes)
-    // Actually: dineroActual = boteInicial - totalPerdido + totalGanado - ganadas.stakes
-    // Wait, let me think again.
-    // bote starts at boteInicial
-    // For each lost bet: bote -= importe (we lose the stake)
-    // For each won bet: bote -= importe (we pay the stake) but bote += posibleGanancia (we receive winnings)
-    // So: dineroActual = boteInicial - sum(all resolved stakes) + sum(won returns)
-    const totalResolvedStakes = resueltas.reduce(
-      (sum, a) => sum + a.importe,
-      0
-    );
-    const dineroActual =
-      state.boteInicial - totalResolvedStakes + totalGanado - totalPendiente;
-
-    // Actually, pendientes shouldn't affect dinero actual until resolved
-    // Let me recalculate:
-    // dineroActual = boteInicial - perdidas.stakes - ganadas.stakes + ganadas.returns
-    // = boteInicial - totalPerdido - ganadas.stakes + totalGanado
     const ganadasStakes = ganadas.reduce((sum, a) => sum + a.importe, 0);
-    const dineroActualCorrected =
-      state.boteInicial - totalPerdido - ganadasStakes + totalGanado;
 
-    const balance = dineroActualCorrected - state.boteInicial;
+    // Misma fórmula que en el Sheet:
+    // Dinero actual = Bote inicial - TODO lo apostado (también lo pendiente,
+    // porque ese dinero ya ha salido del bote en el momento de apostar) +
+    // lo ganado en bruto de las apuestas ya acertadas.
+    const totalApostadoTodas = apuestas.reduce((sum, a) => sum + a.importe, 0);
+    const dineroActual = state.boteInicial - totalApostadoTodas + totalGanado;
+
+    const balance = dineroActual - state.boteInicial;
 
     const pctAcierto =
       resueltas.length > 0
@@ -192,13 +173,11 @@
 
     const numParticipantes = state.participantes.length;
     const aRepartir =
-      numParticipantes > 0
-        ? dineroActualCorrected / numParticipantes
-        : 0;
+      numParticipantes > 0 ? dineroActual / numParticipantes : 0;
 
     return {
       boteInicial: state.boteInicial,
-      dineroActual: dineroActualCorrected,
+      dineroActual,
       balance,
       pctAcierto,
       totalGanadas: ganadas.length,
