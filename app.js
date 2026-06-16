@@ -283,13 +283,21 @@
   }
 
   // ---- Chart: evolución del dinero ----
-  // Niveles de referencia personalizados del grupo
-  const CHART_LEVELS = [
-    { value: 0, label: "Ruina" },
-    { value: 310, label: "Cubatas" },
-    { value: 350, label: "Comida" },
-    { value: 400, label: "Comida + Cubatas" },
-  ];
+  const CHART_LEVELS = [];
+
+  function niceTicks(min, max, count) {
+    const range = max - min || 1;
+    const rawStep = range / count;
+    const mag = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+    const step = Math.ceil(rawStep / mag) * mag || 1;
+    const ticks = [];
+    let v = Math.ceil(min / step) * step;
+    while (v <= max) {
+      ticks.push(v);
+      v += step;
+    }
+    return ticks;
+  }
 
   function buildHistorial() {
     // Solo las apuestas YA RESUELTAS mueven la gráfica (las pendientes no
@@ -340,14 +348,11 @@
     const maxAlcanzado = Math.max(...valores, ...CHART_LEVELS.map((l) => l.value));
     const minAlcanzado = Math.min(...valores, 0);
 
-    const niveles = [...CHART_LEVELS];
-    if (maxAlcanzado > 400) {
-      niveles.push({ value: maxAlcanzado, label: "🏆 Casa Matiki" });
-    }
-
     const yMax = maxAlcanzado * 1.1 || 10;
     const yMin = minAlcanzado < 0 ? minAlcanzado * 1.1 : 0;
     const range = yMax - yMin || 1;
+
+    const niveles = niceTicks(yMin, yMax, 4).map((value) => ({ value }));
 
     const xFor = (i) =>
       historial.length > 1
@@ -355,13 +360,13 @@
         : (PAD_L + (W - PAD_R)) / 2;
     const yFor = (v) => PAD_T + (1 - (v - yMin) / range) * (H - PAD_T - PAD_B);
 
-    // Líneas de referencia personalizadas (Ruina, Cubatas, Comida...)
+    // Líneas de referencia (en euros)
     const gridLines = niveles
       .map((nivel) => {
         const y = yFor(nivel.value);
         return `
           <line x1="${PAD_L}" y1="${y.toFixed(2)}" x2="${W - PAD_R}" y2="${y.toFixed(2)}" class="chart-gridline" />
-          <text x="${PAD_L}" y="${(y - 5).toFixed(2)}" class="chart-gridlabel">${escapeHtml(nivel.label)} · ${formatEuroShort(nivel.value)}</text>
+          <text x="${PAD_L}" y="${(y - 5).toFixed(2)}" class="chart-gridlabel">${formatEuroShort(nivel.value)}</text>
         `;
       })
       .join("");
