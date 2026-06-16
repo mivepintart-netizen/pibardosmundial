@@ -44,6 +44,10 @@
     betCount: $("#bet-count"),
     participantsSummary: $("#participants-summary"),
 
+    // Player of the day
+    playerOfDaySection: $("#player-of-day-section"),
+    playerOfDayCard: $("#player-of-day-card"),
+
     // Chart
     chartWrapper: $("#chart-wrapper"),
     chartCurrent: $("#chart-current"),
@@ -214,12 +218,34 @@
 
   // ---- Render Functions ----
   function renderAll() {
+    renderPlayerOfDay();
     renderStats();
     renderBalanceBar();
     renderChart();
     renderAchievements();
     renderBets();
     renderParticipants();
+  }
+
+  function renderPlayerOfDay() {
+    const jugador = state.jugadorDelDia;
+    if (!jugador || !jugador.nombre) {
+      dom.playerOfDaySection.classList.remove("show");
+      dom.playerOfDayCard.innerHTML = "";
+      return;
+    }
+    dom.playerOfDaySection.classList.add("show");
+    dom.playerOfDayCard.innerHTML = `
+      ${
+        jugador.foto
+          ? `<img class="player-of-day-photo" src="${escapeHtml(jugador.foto)}" alt="${escapeHtml(jugador.nombre)}" loading="lazy" onerror="this.outerHTML='<div class=&quot;player-of-day-photo player-of-day-placeholder&quot;>⚽</div>'">`
+          : `<div class="player-of-day-photo player-of-day-placeholder">⚽</div>`
+      }
+      <div class="player-of-day-info">
+        <span class="player-of-day-tag">🌟 Jugador del día</span>
+        <span class="player-of-day-name">${escapeHtml(jugador.nombre)}</span>
+        ${jugador.motivo ? `<span class="player-of-day-motivo">${escapeHtml(jugador.motivo)}</span>` : ""}
+      </div>`;
   }
 
   function renderStats() {

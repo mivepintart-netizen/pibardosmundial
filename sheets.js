@@ -152,7 +152,27 @@
       }
     }
 
-    return { boteInicial, participantes, apuestas };
+    // --- Jugador del día (opcional) ---
+    // Bloque de 3 filas apiladas, igual que BOTE/DINERO ACTUAL:
+    //   Jugador del día | <nombre>
+    //   Foto            | <url de la imagen>
+    //   Motivo          | <por qué destaca hoy>
+    let jugadorDelDia = null;
+    const jugadorPos = findLabel(rows, "Jugador del día");
+    if (jugadorPos) {
+      const nombre = cellValue(rows[jugadorPos.r], jugadorPos.c + 1);
+      const foto = cellValue(rows[jugadorPos.r + 1], jugadorPos.c + 1);
+      const motivo = cellValue(rows[jugadorPos.r + 2], jugadorPos.c + 1);
+      if (nombre) {
+        jugadorDelDia = {
+          nombre: String(nombre),
+          foto: foto ? String(foto) : "",
+          motivo: motivo ? String(motivo) : "",
+        };
+      }
+    }
+
+    return { boteInicial, participantes, apuestas, jugadorDelDia };
   }
 
   // ---- Controlador de polling ----
