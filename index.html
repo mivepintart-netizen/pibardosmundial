@@ -1,216 +1,168 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Tracker de apuestas deportivas del Mundial 2026 - Controla tu bote, apuestas y ganancias con tu grupo de amigos">
-  <title>🏆 Mundial 2026 — Bet Tracker</title>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Tracker de apuestas deportivas del Mundial 2026 - Controla tu bote, apuestas y ganancias con tu grupo de amigos">
+<title>🏆 Mundial 2026 — Bet Tracker</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
 </head>
 <body>
+<!-- ======== HEADER ======== -->
+<header class="header">
+<div class="header-content">
+<div class="logo">
+<span class="logo-icon">🏆</span>
+<div>
+<h1>Mundial 2026</h1>
+<p class="subtitle">Bet Tracker</p>
+</div>
+</div>
+<div class="header-actions">
+<div class="sync-badge" id="sync-badge" title="Estado de sincronización con Google Sheets">
+<span class="sync-dot" id="sync-dot"></span>
+<span id="sync-text">Conectando…</span>
+<button class="sync-refresh" id="btn-refresh" title="Sincronizar ahora">⟳</button>
+</div>
+<button class="btn btn-gold" id="btn-share" title="Compartir resumen por WhatsApp">
+<span>📱</span> Compartir
+</button>
+<a class="btn btn-primary" id="btn-add" href="https://docs.google.com/spreadsheets/d/1fArzmnr_DomX_IowuOGmkW091O9fgL4Vwqdc7eMak78/edit" title="Añadir una apuesta nueva en el Google Sheet" target="_blank" rel="noopener">
+<span>＋</span> Nueva Apuesta
+</a>
+</div>
+</div>
+</header>
 
-  <!-- ======== HEADER ======== -->
-  <header class="header">
-    <div class="header-content">
-      <div class="logo">
-        <span class="logo-icon">🏆</span>
-        <div>
-          <h1>Mundial 2026</h1>
-          <p class="subtitle">Bet Tracker</p>
-        </div>
-      </div>
-      <div class="header-actions">
-        <button class="btn btn-gold" id="btn-share" title="Compartir resumen por WhatsApp">
-          <span>📱</span> Compartir
-        </button>
-        <button class="btn btn-primary" id="btn-add" title="Añadir nueva apuesta">
-          <span>＋</span> Nueva Apuesta
-        </button>
-      </div>
-    </div>
-  </header>
+<main class="container">
 
-  <main class="container">
+<!-- ======== DASHBOARD STATS ======== -->
+<section class="dashboard" id="dashboard">
+<div class="stat-card stat-bote">
+<div class="stat-icon">💰</div>
+<div class="stat-info">
+<span class="stat-label">Bote Inicial</span>
+<span class="stat-value" id="stat-bote">0,00 €</span>
+<span class="stat-sub" id="stat-bote-sub">9 participantes</span>
+</div>
+</div>
+<div class="stat-card stat-actual">
+<div class="stat-icon">💵</div>
+<div class="stat-info">
+<span class="stat-label">Dinero Actual</span>
+<span class="stat-value" id="stat-actual">0,00 €</span>
+<span class="stat-sub" id="stat-actual-sub">en el bote</span>
+</div>
+</div>
+<div class="stat-card stat-balance" id="stat-balance-card">
+<div class="stat-icon">📊</div>
+<div class="stat-info">
+<span class="stat-label">Balance</span>
+<span class="stat-value" id="stat-balance">0,00 €</span>
+<span class="stat-sub" id="stat-balance-sub">desde el inicio</span>
+</div>
+</div>
+<div class="stat-card stat-acierto">
+<div class="stat-icon">🎯</div>
+<div class="stat-info">
+<span class="stat-label">% Acierto</span>
+<span class="stat-value" id="stat-acierto">0%</span>
+<span class="stat-sub" id="stat-acierto-sub">0 de 0 resueltas</span>
+</div>
+</div>
+</section>
 
-    <!-- ======== DASHBOARD STATS ======== -->
-    <section class="dashboard" id="dashboard">
-      <div class="stat-card stat-bote">
-        <div class="stat-icon">💰</div>
-        <div class="stat-info">
-          <span class="stat-label">Bote Inicial</span>
-          <span class="stat-value" id="stat-bote">0,00 €</span>
-          <span class="stat-sub" id="stat-bote-sub">9 participantes</span>
-        </div>
-      </div>
-      <div class="stat-card stat-actual">
-        <div class="stat-icon">💵</div>
-        <div class="stat-info">
-          <span class="stat-label">Dinero Actual</span>
-          <span class="stat-value" id="stat-actual">0,00 €</span>
-          <span class="stat-sub" id="stat-actual-sub">en el bote</span>
-        </div>
-      </div>
-      <div class="stat-card stat-balance" id="stat-balance-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-info">
-          <span class="stat-label">Balance</span>
-          <span class="stat-value" id="stat-balance">0,00 €</span>
-          <span class="stat-sub" id="stat-balance-sub">desde el inicio</span>
-        </div>
-      </div>
-      <div class="stat-card stat-acierto">
-        <div class="stat-icon">🎯</div>
-        <div class="stat-info">
-          <span class="stat-label">% Acierto</span>
-          <span class="stat-value" id="stat-acierto">0%</span>
-          <span class="stat-sub" id="stat-acierto-sub">0 de 0 resueltas</span>
-        </div>
-      </div>
-    </section>
+<!-- ======== BALANCE BAR ======== -->
+<section class="balance-bar-container">
+<div class="balance-bar-wrapper">
+<div class="balance-bar-header">
+<span class="balance-bar-title">Distribución del bote</span>
+<div class="balance-bar-values">
+<span><span class="dot dot-spent"></span> Perdido: <strong id="bar-lost">0 €</strong></span>
+<span><span class="dot dot-profit"></span> Ganado: <strong id="bar-won">0 €</strong></span>
+<span><span class="dot dot-remaining"></span> Disponible: <strong id="bar-available">0 €</strong></span>
+</div>
+</div>
+<div class="balance-bar" id="balance-bar">
+<div class="balance-bar-fill-spent" id="bar-fill-spent" style="width: 0%"></div>
+<div class="balance-bar-fill-won" id="bar-fill-won" style="width: 0%"></div>
+<div class="balance-bar-fill-remaining" id="bar-fill-remaining" style="width: 0%"></div>
+</div>
+</div>
+</section>
 
-    <!-- ======== BALANCE BAR ======== -->
-    <section class="balance-bar-container">
-      <div class="balance-bar-wrapper">
-        <div class="balance-bar-header">
-          <span class="balance-bar-title">Distribución del bote</span>
-          <div class="balance-bar-values">
-            <span><span class="dot dot-spent"></span> Perdido: <strong id="bar-lost">0 €</strong></span>
-            <span><span class="dot dot-profit"></span> Ganado: <strong id="bar-won">0 €</strong></span>
-            <span><span class="dot dot-remaining"></span> Disponible: <strong id="bar-available">0 €</strong></span>
-          </div>
-        </div>
-        <div class="balance-bar" id="balance-bar">
-          <div class="balance-bar-fill-spent" id="bar-fill-spent" style="width: 0%"></div>
-          <div class="balance-bar-fill-won" id="bar-fill-won" style="width: 0%"></div>
-          <div class="balance-bar-fill-remaining" id="bar-fill-remaining" style="width: 0%"></div>
-        </div>
-      </div>
-    </section>
+<!-- ======== FILTERS ======== -->
+<section class="filters">
+<div class="filter-group" id="filter-group">
+<button class="filter-btn active" data-filter="all">Todas</button>
+<button class="filter-btn" data-filter="ganada">✅ Ganadas</button>
+<button class="filter-btn" data-filter="perdida">❌ Perdidas</button>
+<button class="filter-btn" data-filter="pendiente">⏳ Pendientes</button>
+</div>
+</section>
 
-    <!-- ======== FILTERS ======== -->
-    <section class="filters">
-      <div class="filter-group" id="filter-group">
-        <button class="filter-btn active" data-filter="all">Todas</button>
-        <button class="filter-btn" data-filter="ganada">✅ Ganadas</button>
-        <button class="filter-btn" data-filter="perdida">❌ Perdidas</button>
-        <button class="filter-btn" data-filter="pendiente">⏳ Pendientes</button>
-      </div>
-    </section>
+<!-- ======== BETS LIST ======== -->
+<section class="bets-section">
+<div class="section-header">
+<h2>⚽ Apuestas</h2>
+<span class="bet-count" id="bet-count">0 apuestas</span>
+</div>
+<div class="bets-list" id="bets-list">
+<!-- Rendered by JS -->
+</div>
+</section>
 
-    <!-- ======== BETS LIST ======== -->
-    <section class="bets-section">
-      <div class="section-header">
-        <h2>⚽ Apuestas</h2>
-        <span class="bet-count" id="bet-count">0 apuestas</span>
-      </div>
-      <div class="bets-list" id="bets-list">
-        <!-- Rendered by JS -->
-      </div>
-    </section>
+<!-- ======== PARTICIPANTS ======== -->
+<section class="participants-section">
+<div class="section-header">
+<h2>👥 Participantes</h2>
+</div>
+<div class="participants-grid" id="participants-grid">
+<!-- Rendered by JS -->
+</div>
+</section>
 
-    <!-- ======== PARTICIPANTS ======== -->
-    <section class="participants-section">
-      <div class="section-header">
-        <h2>👥 Participantes</h2>
-      </div>
-      <div class="participants-grid" id="participants-grid">
-        <!-- Rendered by JS -->
-      </div>
-    </section>
+<!-- ======== DATA BAR ======== -->
+<div class="data-bar">
+<span class="data-bar-note">Los datos vienen del Google Sheet del grupo. Para añadir o corregir una apuesta, edítala ahí.</span>
+<button class="btn btn-sm btn-secondary" id="btn-export" title="Exportar datos como JSON">
+📥 Exportar
+</button>
+</div>
 
-    <!-- ======== DATA BAR ======== -->
-    <div class="data-bar">
-      <button class="btn btn-sm btn-secondary" id="btn-export" title="Exportar datos como JSON">
-        📥 Exportar
-      </button>
-      <button class="btn btn-sm btn-secondary" id="btn-import" title="Importar datos desde JSON">
-        📤 Importar
-      </button>
-      <button class="btn btn-sm btn-danger" id="btn-reset" title="Resetear a datos originales del Excel">
-        🔄 Resetear
-      </button>
-      <input type="file" id="import-file" accept=".json" class="hidden">
-    </div>
+</main>
 
-  </main>
+<!-- ======== SHARE MODAL ======== -->
+<div class="modal-overlay" id="share-overlay">
+<div class="modal share-modal">
+<div class="modal-header">
+<h3>📱 Compartir por WhatsApp</h3>
+<button class="modal-close" id="share-close">&times;</button>
+</div>
+<div class="share-preview" id="share-preview">
+<div class="share-message" id="share-message"></div>
+</div>
+<div class="share-actions">
+<button class="btn btn-secondary" id="btn-copy">📋 Copiar</button>
+<button class="btn btn-whatsapp" id="btn-whatsapp">📱 Enviar por WhatsApp</button>
+</div>
+</div>
+</div>
 
-  <!-- ======== ADD/EDIT BET MODAL ======== -->
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal">
-      <div class="modal-header">
-        <h3 id="modal-title">Nueva Apuesta</h3>
-        <button class="modal-close" id="modal-close">&times;</button>
-      </div>
-      <form id="bet-form">
-        <input type="hidden" id="input-id">
-        <div class="form-group">
-          <label for="input-partido">Partido</label>
-          <input type="text" id="input-partido" placeholder="Ej: España - Alemania" required>
-        </div>
-        <div class="form-group">
-          <label for="input-apuesta">Apuesta</label>
-          <input type="text" id="input-apuesta" placeholder="Ej: Ganador España" required>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="input-cuota">Cuota</label>
-            <input type="number" id="input-cuota" step="0.01" min="1" placeholder="1.50" required>
-          </div>
-          <div class="form-group">
-            <label for="input-importe">Importe (€)</label>
-            <input type="number" id="input-importe" step="0.01" min="0" placeholder="10.00" required>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="input-estado">Estado</label>
-          <select id="input-estado">
-            <option value="pendiente">⏳ Pendiente</option>
-            <option value="ganada">✅ Ganada</option>
-            <option value="perdida">❌ Perdida</option>
-          </select>
-        </div>
-        <div class="form-preview" id="form-preview">
-          <span class="preview-label">Posible ganancia:</span>
-          <span class="preview-value" id="preview-ganancia">0,00 €</span>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary" id="btn-cancel">Cancelar</button>
-          <button type="submit" class="btn btn-gold" id="btn-submit">Guardar</button>
-        </div>
-      </form>
-    </div>
-  </div>
+<!-- ======== TOAST ======== -->
+<div class="toast" id="toast">
+<span id="toast-icon"></span>
+<span id="toast-message"></span>
+</div>
 
-  <!-- ======== SHARE MODAL ======== -->
-  <div class="modal-overlay" id="share-overlay">
-    <div class="modal share-modal">
-      <div class="modal-header">
-        <h3>📱 Compartir por WhatsApp</h3>
-        <button class="modal-close" id="share-close">&times;</button>
-      </div>
-      <div class="share-preview" id="share-preview">
-        <div class="share-message" id="share-message"></div>
-      </div>
-      <div class="share-actions">
-        <button class="btn btn-secondary" id="btn-copy">📋 Copiar</button>
-        <button class="btn btn-whatsapp" id="btn-whatsapp">📱 Enviar por WhatsApp</button>
-      </div>
-    </div>
-  </div>
+<!-- ======== FOOTER ======== -->
+<footer class="footer">
+<p>Mundial 2026 Bet Tracker 🏆 • Hecho para la peña</p>
+</footer>
 
-  <!-- ======== TOAST ======== -->
-  <div class="toast" id="toast">
-    <span id="toast-icon"></span>
-    <span id="toast-message"></span>
-  </div>
-
-  <!-- ======== FOOTER ======== -->
-  <footer class="footer">
-    <p>Mundial 2026 Bet Tracker 🏆 • Hecho para la peña</p>
-  </footer>
-
-  <script src="data.js"></script>
-  <script src="app.js"></script>
+<script src="data.js"></script>
+<script src="sheets.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

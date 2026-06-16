@@ -170,7 +170,70 @@ body::before {
 
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ---- Sync Badge ---- */
+.sync-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+  transition: background var(--transition-fast);
+}
+
+.sync-badge.ok .sync-dot {
+  background: var(--green);
+  box-shadow: 0 0 6px rgba(0, 214, 143, 0.6);
+}
+
+.sync-badge.loading .sync-dot {
+  background: var(--blue);
+  animation: syncPulse 1s ease-in-out infinite;
+}
+
+.sync-badge.error .sync-dot {
+  background: var(--red);
+}
+
+@keyframes syncPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.sync-refresh {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+  transition: transform var(--transition-base), color var(--transition-fast);
+}
+
+.sync-refresh:hover {
+  color: var(--gold-light);
+  transform: rotate(180deg);
 }
 
 /* ---- Buttons ---- */
@@ -542,13 +605,6 @@ body::before {
   justify-content: center;
   font-size: 1.15rem;
   flex-shrink: 0;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  position: relative;
-}
-
-.bet-status-badge:hover {
-  transform: scale(1.1);
 }
 
 .bet-status-badge.ganada {
@@ -570,48 +626,6 @@ body::before {
 @keyframes pendientePulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 179, 71, 0.15); }
   50% { box-shadow: 0 0 0 6px rgba(255, 179, 71, 0); }
-}
-
-/* Status dropdown */
-.status-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color-hover);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-lg);
-  z-index: 50;
-  overflow: hidden;
-  display: none;
-  min-width: 140px;
-}
-
-.status-dropdown.show {
-  display: block;
-  animation: dropdownIn 0.15s ease;
-}
-
-@keyframes dropdownIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-
-.status-option {
-  padding: 8px 14px;
-  font-size: 0.82rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: background var(--transition-fast);
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.status-option:hover {
-  background: rgba(255, 255, 255, 0.06);
 }
 
 .bet-info {
@@ -678,12 +692,6 @@ body::before {
 .bet-card.perdida .bet-result-label { color: rgba(255, 92, 114, 0.6); }
 .bet-card.pendiente .bet-potential { color: var(--amber); }
 .bet-card.pendiente .bet-result-label { color: rgba(255, 179, 71, 0.6); }
-
-.bet-actions {
-  display: flex;
-  gap: 4px;
-  margin-left: 8px;
-}
 
 /* ---- Empty State ---- */
 .empty-state {
@@ -855,99 +863,6 @@ body::before {
   color: var(--text-primary);
 }
 
-/* ---- Form ---- */
-form {
-  padding: 20px 24px 24px;
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group label {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 6px;
-}
-
-.form-group input,
-.form-group select {
-  width: 100%;
-  padding: 11px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  font-size: 0.88rem;
-  transition: all var(--transition-fast);
-  outline: none;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.1);
-}
-
-.form-group input::placeholder {
-  color: var(--text-muted);
-}
-
-.form-group select {
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%237d84a0' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 36px;
-}
-
-.form-group select option {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.form-preview {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  background: rgba(212, 168, 83, 0.06);
-  border: 1px solid rgba(212, 168, 83, 0.15);
-  border-radius: var(--radius-sm);
-  margin-bottom: 20px;
-}
-
-.preview-label {
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.preview-value {
-  font-family: 'Outfit', sans-serif;
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--gold-light);
-}
-
-.form-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
 /* ---- Share Modal ---- */
 .share-modal {
   max-width: 520px;
@@ -1023,9 +938,15 @@ form {
 .data-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   padding: 8px 0 16px;
+  flex-wrap: wrap;
+}
+
+.data-bar-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 /* ---- Scrollbar ---- */
@@ -1085,14 +1006,6 @@ form {
     text-align: left;
   }
 
-  .bet-actions {
-    grid-column: 1 / -1;
-    justify-content: flex-end;
-    margin-left: 0;
-    padding-top: 8px;
-    border-top: 1px solid var(--border-color);
-  }
-
   .participants-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
@@ -1130,8 +1043,9 @@ form {
     justify-content: center;
   }
 
-  .form-row {
-    grid-template-columns: 1fr;
+  .sync-badge {
+    width: 100%;
+    justify-content: center;
   }
 
   .balance-bar-values {

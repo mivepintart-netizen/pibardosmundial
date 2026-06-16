@@ -6,13 +6,14 @@
   "use strict";
 
   // ---- Constants ----
-  const STORAGE_KEY = "mundial2026_tracker";
+  // (ya no usamos localStorage: los datos vienen de Google Sheets vía sheets.js)
 
   // ---- State ----
-  let state = loadState();
+  // Arrancamos con los datos del Excel como placeholder mientras llega
+  // la primera respuesta del Sheet, para no mostrar la pantalla vacía.
+  let state = JSON.parse(JSON.stringify(INITIAL_DATA));
   let currentFilter = "all";
-  let editingBetId = null;
-  let openDropdownId = null;
+  let lastSyncAt = null;
 
   // ---- DOM Refs ----
   const $ = (sel) => document.querySelector(sel);
@@ -46,20 +47,11 @@
     // Filters
     filterGroup: $("#filter-group"),
 
-    // Add/Edit Modal
-    modalOverlay: $("#modal-overlay"),
-    modalTitle: $("#modal-title"),
-    modalClose: $("#modal-close"),
-    betForm: $("#bet-form"),
-    inputId: $("#input-id"),
-    inputPartido: $("#input-partido"),
-    inputApuesta: $("#input-apuesta"),
-    inputCuota: $("#input-cuota"),
-    inputImporte: $("#input-importe"),
-    inputEstado: $("#input-estado"),
-    previewGanancia: $("#preview-ganancia"),
-    btnCancel: $("#btn-cancel"),
-    btnSubmit: $("#btn-submit"),
+    // Sync badge
+    syncBadge: $("#sync-badge"),
+    syncDot: $("#sync-dot"),
+    syncText: $("#sync-text"),
+    btnRefresh: $("#btn-refresh"),
 
     // Share Modal
     shareOverlay: $("#share-overlay"),
@@ -69,12 +61,8 @@
     btnWhatsapp: $("#btn-whatsapp"),
 
     // Buttons
-    btnAdd: $("#btn-add"),
     btnShare: $("#btn-share"),
     btnExport: $("#btn-export"),
-    btnImport: $("#btn-import"),
-    btnReset: $("#btn-reset"),
-    importFile: $("#import-file"),
 
     // Toast
     toast: $("#toast"),
@@ -86,28 +74,47 @@
   function init() {
     renderAll();
     bindEvents();
+    bindSheetSync();
+    SheetSync.init();
+    setInterval(tickSyncBadge, 1000);
   }
 
-  // ---- State Management ----
-  function loadState() {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
+  // ---- Sincronización con Google Sheets ----
+  function bindSheetSync() {
+    SheetSync.onUpdate((event, payload) => {
+      if (event === "sync-start") {
+        setSyncBadge("loading", "Sincronizando…");
+      } else if (event === "update") {
+        state = payload;
+        renderAll();
+        lastSyncAt = Date.now();
+        setSyncBadge("ok", "Sincronizado ahora");
+      } else if (event === "sync-error") {
+        setSyncBadge("error", "Sin conexión con el Sheet");
+      } else if (event === "new-bets") {
+        const n = payload.length;
+        showToast(
+          "🆕",
+          `${n} apuesta${n > 1 ? "s" : ""} nueva${n > 1 ? "s" : ""} detectada${n > 1 ? "s" : ""}`,
+          "success"
+        );
       }
-    } catch (e) {
-      console.warn("Error loading state:", e);
-    }
-    // Return deep copy of initial data
-    return JSON.parse(JSON.stringify(INITIAL_DATA));
+    });
   }
 
-  function saveState() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
-      console.warn("Error saving state:", e);
-    }
+  function setSyncBadge(status, text) {
+    dom.syncBadge.classList.remove("ok", "loading", "error");
+    dom.syncBadge.classList.add(status);
+    dom.syncText.textContent = text;
+  }
+
+  function tickSyncBadge() {
+    if (!lastSyncAt) return;
+    if (dom.syncBadge.classList.contains("error")) return; // no pisar el mensaje de error
+    if (dom.syncBadge.classList.contains("loading")) return;
+    const secs = Math.max(0, Math.round((Date.now() - lastSyncAt) / 1000));
+    const when = secs < 5 ? "ahora" : `hace ${secs}s`;
+    dom.syncText.textContent = `Sincronizado ${when}`;
   }
 
   // ---- Calculations ----
@@ -260,7 +267,7 @@
           <div class="empty-state-text">
             ${
               currentFilter === "all"
-                ? "No hay apuestas todavía. ¡Añade la primera!"
+                ? "Todavía no hay apuestas en el Sheet."
                 : `No hay apuestas ${
                     currentFilter === "ganada"
                       ? "ganadas"
@@ -282,13 +289,8 @@
       .map(
         (bet, idx) => `
       <div class="bet-card ${bet.estado}" data-id="${bet.id}" style="animation-delay: ${idx * 0.04}s">
-        <div class="bet-status-badge ${bet.estado}" data-id="${bet.id}" title="Cambiar estado">
+        <div class="bet-status-badge ${bet.estado}" title="${bet.estado}">
           ${statusEmoji(bet.estado)}
-          <div class="status-dropdown" id="dropdown-${bet.id}">
-            <div class="status-option" data-estado="pendiente" data-id="${bet.id}">⏳ Pendiente</div>
-            <div class="status-option" data-estado="ganada" data-id="${bet.id}">✅ Ganada</div>
-            <div class="status-option" data-estado="perdida" data-id="${bet.id}">❌ Perdida</div>
-          </div>
         </div>
         <div class="bet-info">
           <div class="bet-match">${escapeHtml(bet.partido)}</div>
@@ -314,10 +316,6 @@
               : "perdido"
           }</div>
         </div>
-        <div class="bet-actions">
-          <button class="btn-icon" onclick="app.editBet(${bet.id})" title="Editar">✏️</button>
-          <button class="btn-icon" onclick="app.deleteBet(${bet.id})" title="Eliminar">🗑️</button>
-        </div>
       </div>`
       )
       .join("");
@@ -332,14 +330,21 @@
   function renderParticipants() {
     const s = calcStats();
 
-    dom.participantsGrid.innerHTML = state.participantes
+    // Clasificación: ordenamos por balance individual (aRepartir - aportación) descendente
+    const ranked = [...state.participantes]
+      .map((p) => ({ ...p, balance: s.aRepartir - p.aportacion }))
+      .sort((a, b) => b.balance - a.balance);
+
+    const medal = (pos) => (pos === 0 ? "🥇 " : pos === 1 ? "🥈 " : pos === 2 ? "🥉 " : "");
+
+    dom.participantsGrid.innerHTML = ranked
       .map(
         (p, idx) => `
       <div class="participant-card">
         <div class="participant-avatar avatar-${(idx % 9) + 1}">
           ${p.nombre.charAt(0).toUpperCase()}
         </div>
-        <div class="participant-name">${escapeHtml(p.nombre)}</div>
+        <div class="participant-name">${medal(idx)}${escapeHtml(p.nombre)}</div>
         <div class="participant-stats">
           <div class="participant-stat">
             <span class="participant-stat-label">Aportó</span>
@@ -356,10 +361,8 @@
           <div class="participant-stat">
             <span class="participant-stat-label">Balance</span>
             <span class="participant-stat-value ${
-              s.aRepartir - p.aportacion >= 0 ? "positive" : "negative"
-            }">${
-          s.aRepartir - p.aportacion >= 0 ? "+" : ""
-        }${formatEuroShort(s.aRepartir - p.aportacion)}</span>
+              p.balance >= 0 ? "positive" : "negative"
+            }">${p.balance >= 0 ? "+" : ""}${formatEuroShort(p.balance)}</span>
           </div>
         </div>
       </div>`
@@ -387,35 +390,12 @@
     return div.innerHTML;
   }
 
-  function getNextId() {
-    return state.apuestas.length > 0
-      ? Math.max(...state.apuestas.map((a) => a.id)) + 1
-      : 1;
-  }
-
   // ---- Event Binding ----
   function bindEvents() {
-    // Add bet button
-    dom.btnAdd.addEventListener("click", () => openAddModal());
-
-    // Close modals
-    dom.modalClose.addEventListener("click", () => closeModal());
-    dom.btnCancel.addEventListener("click", () => closeModal());
-    dom.modalOverlay.addEventListener("click", (e) => {
-      if (e.target === dom.modalOverlay) closeModal();
-    });
-
     dom.shareClose.addEventListener("click", () => closeShareModal());
     dom.shareOverlay.addEventListener("click", (e) => {
       if (e.target === dom.shareOverlay) closeShareModal();
     });
-
-    // Form input preview
-    dom.inputCuota.addEventListener("input", updatePreview);
-    dom.inputImporte.addEventListener("input", updatePreview);
-
-    // Form submit
-    dom.betForm.addEventListener("submit", handleFormSubmit);
 
     // Filters
     dom.filterGroup.addEventListener("click", (e) => {
@@ -427,33 +407,6 @@
       renderBets();
     });
 
-    // Status badge clicks (event delegation on bets list)
-    dom.betsList.addEventListener("click", (e) => {
-      // Status badge
-      const badge = e.target.closest(".bet-status-badge");
-      if (badge && !e.target.closest(".status-option")) {
-        e.stopPropagation();
-        const id = parseInt(badge.dataset.id);
-        toggleStatusDropdown(id);
-        return;
-      }
-
-      // Status option
-      const option = e.target.closest(".status-option");
-      if (option) {
-        e.stopPropagation();
-        const id = parseInt(option.dataset.id);
-        const estado = option.dataset.estado;
-        changeStatus(id, estado);
-        return;
-      }
-    });
-
-    // Close dropdowns on outside click
-    document.addEventListener("click", () => {
-      closeAllDropdowns();
-    });
-
     // Share button
     dom.btnShare.addEventListener("click", openShareModal);
 
@@ -463,177 +416,17 @@
 
     // Data management
     dom.btnExport.addEventListener("click", exportData);
-    dom.btnImport.addEventListener("click", () => dom.importFile.click());
-    dom.importFile.addEventListener("change", importData);
-    dom.btnReset.addEventListener("click", resetData);
+
+    // Sincronizar ahora (botón manual)
+    dom.btnRefresh.addEventListener("click", () => SheetSync.refreshNow());
 
     // Keyboard shortcuts
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        closeModal();
         closeShareModal();
-        closeAllDropdowns();
       }
     });
   }
-
-  // ---- Modal Functions ----
-  function openAddModal() {
-    editingBetId = null;
-    dom.modalTitle.textContent = "Nueva Apuesta";
-    dom.btnSubmit.textContent = "💾 Guardar";
-    dom.betForm.reset();
-    dom.inputEstado.value = "pendiente";
-    dom.previewGanancia.textContent = "0,00 €";
-    dom.modalOverlay.classList.add("active");
-  }
-
-  function openEditModal(bet) {
-    editingBetId = bet.id;
-    dom.modalTitle.textContent = "Editar Apuesta";
-    dom.btnSubmit.textContent = "💾 Actualizar";
-    dom.inputPartido.value = bet.partido;
-    dom.inputApuesta.value = bet.apuesta;
-    dom.inputCuota.value = bet.cuota;
-    dom.inputImporte.value = bet.importe;
-    dom.inputEstado.value = bet.estado;
-    updatePreview();
-    dom.modalOverlay.classList.add("active");
-  }
-
-  function closeModal() {
-    dom.modalOverlay.classList.remove("active");
-    editingBetId = null;
-  }
-
-  function updatePreview() {
-    const cuota = parseFloat(dom.inputCuota.value) || 0;
-    const importe = parseFloat(dom.inputImporte.value) || 0;
-    const ganancia = cuota * importe;
-    dom.previewGanancia.textContent = formatEuroShort(ganancia);
-  }
-
-  function handleFormSubmit(e) {
-    e.preventDefault();
-
-    const partido = dom.inputPartido.value.trim();
-    const apuesta = dom.inputApuesta.value.trim();
-    const cuota = parseFloat(dom.inputCuota.value);
-    const importe = parseFloat(dom.inputImporte.value);
-    const estado = dom.inputEstado.value;
-    const posibleGanancia = Math.round(cuota * importe * 100) / 100;
-
-    if (!partido || !apuesta || isNaN(cuota) || isNaN(importe)) {
-      showToast("⚠️", "Rellena todos los campos", "error");
-      return;
-    }
-
-    if (editingBetId !== null) {
-      // Edit existing bet
-      const idx = state.apuestas.findIndex((a) => a.id === editingBetId);
-      if (idx !== -1) {
-        state.apuestas[idx] = {
-          ...state.apuestas[idx],
-          partido,
-          apuesta,
-          cuota,
-          importe,
-          posibleGanancia,
-          estado,
-        };
-        showToast("✅", "Apuesta actualizada", "success");
-      }
-    } else {
-      // Add new bet
-      state.apuestas.push({
-        id: getNextId(),
-        partido,
-        apuesta,
-        cuota,
-        importe,
-        posibleGanancia,
-        estado,
-      });
-      showToast("✅", "Apuesta añadida", "success");
-    }
-
-    saveState();
-    renderAll();
-    closeModal();
-  }
-
-  // ---- Status Management ----
-  function toggleStatusDropdown(id) {
-    closeAllDropdowns();
-    const dropdown = $(`#dropdown-${id}`);
-    if (dropdown) {
-      dropdown.classList.add("show");
-      openDropdownId = id;
-    }
-  }
-
-  function closeAllDropdowns() {
-    $$(".status-dropdown.show").forEach((d) => d.classList.remove("show"));
-    openDropdownId = null;
-  }
-
-  function changeStatus(id, newEstado) {
-    const bet = state.apuestas.find((a) => a.id === id);
-    if (bet) {
-      const oldEstado = bet.estado;
-      bet.estado = newEstado;
-      saveState();
-      renderAll();
-      closeAllDropdowns();
-
-      const labels = {
-        ganada: "ganada ✅",
-        perdida: "perdida ❌",
-        pendiente: "pendiente ⏳",
-      };
-      showToast(
-        "🔄",
-        `${bet.partido}: ${labels[newEstado]}`,
-        newEstado === "ganada"
-          ? "success"
-          : newEstado === "perdida"
-          ? "error"
-          : "info"
-      );
-    }
-  }
-
-  // ---- Bet CRUD ----
-  window.app = {
-    editBet(id) {
-      const bet = state.apuestas.find((a) => a.id === id);
-      if (bet) openEditModal(bet);
-    },
-
-    deleteBet(id) {
-      const bet = state.apuestas.find((a) => a.id === id);
-      if (!bet) return;
-
-      if (confirm(`¿Eliminar la apuesta "${bet.apuesta}" de ${bet.partido}?`)) {
-        // Animate removal
-        const card = $(`.bet-card[data-id="${id}"]`);
-        if (card) {
-          card.classList.add("removing");
-          setTimeout(() => {
-            state.apuestas = state.apuestas.filter((a) => a.id !== id);
-            saveState();
-            renderAll();
-            showToast("🗑️", "Apuesta eliminada", "info");
-          }, 300);
-        } else {
-          state.apuestas = state.apuestas.filter((a) => a.id !== id);
-          saveState();
-          renderAll();
-          showToast("🗑️", "Apuesta eliminada", "info");
-        }
-      }
-    },
-  };
 
   // ---- Share Functions ----
   function generateShareMessage(lastBet) {
@@ -742,48 +535,6 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast("📥", "Datos exportados", "success");
-  }
-
-  function importData(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function (event) {
-      try {
-        const data = JSON.parse(event.target.result);
-        if (
-          data.boteInicial !== undefined &&
-          data.participantes &&
-          data.apuestas
-        ) {
-          state = data;
-          saveState();
-          renderAll();
-          showToast("📤", "Datos importados correctamente", "success");
-        } else {
-          showToast("⚠️", "Formato de archivo no válido", "error");
-        }
-      } catch (err) {
-        showToast("⚠️", "Error al leer el archivo", "error");
-      }
-    };
-    reader.readAsText(file);
-    // Reset input
-    e.target.value = "";
-  }
-
-  function resetData() {
-    if (
-      confirm(
-        "¿Estás seguro? Esto resetará todos los datos a los valores originales del Excel."
-      )
-    ) {
-      state = JSON.parse(JSON.stringify(INITIAL_DATA));
-      saveState();
-      renderAll();
-      showToast("🔄", "Datos reseteados", "info");
-    }
   }
 
   // ---- Toast ----
