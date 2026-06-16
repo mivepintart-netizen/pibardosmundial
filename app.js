@@ -574,6 +574,14 @@
               : "perdido"
           }</div>
         </div>
+        ${
+          bet.estado === "pendiente"
+            ? `<div class="bet-resolve">
+                <button class="btn-resolve win" data-row="${bet.sheetRow}" data-estado="ganada" title="Marcar como ganada">✅</button>
+                <button class="btn-resolve lose" data-row="${bet.sheetRow}" data-estado="perdida" title="Marcar como perdida">❌</button>
+              </div>`
+            : ""
+        }
       </div>`
       )
       .join("");
@@ -661,6 +669,13 @@
       renderBets();
     });
 
+    // Resolver apuesta (ganada/perdida) desde la tarjeta
+    dom.betsList.addEventListener("click", (e) => {
+      const btn = e.target.closest(".btn-resolve");
+      if (!btn) return;
+      handleResolveBet(parseInt(btn.dataset.row, 10), btn.dataset.estado);
+    });
+
     // Share button
     dom.btnShare.addEventListener("click", openShareModal);
 
@@ -681,6 +696,22 @@
         closeShareModal();
       }
     });
+  }
+
+  // ---- Resolver apuesta (ganada/perdida) ----
+  async function handleResolveBet(sheetRow, estado) {
+    if (!sheetRow) {
+      showToast("⚠️", "No se pudo identificar la fila de esa apuesta", "error");
+      return;
+    }
+    showToast(estado === "ganada" ? "✅" : "❌", "Actualizando…", "success");
+    try {
+      await SheetSync.resolveBet(sheetRow, estado);
+      setTimeout(() => SheetSync.refreshNow(), 2000);
+    } catch (err) {
+      console.error("Error resolviendo apuesta:", err);
+      showToast("⚠️", "No se pudo actualizar (sin conexión)", "error");
+    }
   }
 
   // ---- Add Bet Modal ----

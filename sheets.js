@@ -122,6 +122,7 @@
         if (!partido) break; // primera fila vacía = fin de la tabla
         apuestas.push({
           id: autoId++,
+          sheetRow: r + 1, // fila real en el Sheet (1-indexada), para poder actualizarla luego
           partido: String(partido),
           apuesta: String(cellValue(rows[r], partidoPos.c + 1) || ""),
           cuota: toNumber(cellValue(rows[r], partidoPos.c + 2)),
@@ -246,6 +247,31 @@
     return null;
   }
 
+  // ============================================================
+  // Marcar una apuesta ya existente como ganada o perdida
+  // ============================================================
+  async function resolveBet(sheetRow, estado) {
+    if (!CONFIG.APPS_SCRIPT_URL || CONFIG.APPS_SCRIPT_URL.includes("PEGA_AQUI")) {
+      throw new Error("Falta configurar APPS_SCRIPT_URL en sheets.js");
+    }
+    if (estado !== "ganada" && estado !== "perdida") {
+      throw new Error('estado debe ser "ganada" o "perdida"');
+    }
+
+    const params = new URLSearchParams({
+      action: "resolve",
+      row: sheetRow,
+      estado,
+    });
+
+    await fetch(`${CONFIG.APPS_SCRIPT_URL}?${params.toString()}`, {
+      method: "GET",
+      mode: "no-cors",
+    });
+
+    return null;
+  }
+
   // ---- API pública ----
   window.SheetSync = {
     init() {
@@ -259,6 +285,7 @@
       return syncOnce();
     },
     submitBet,
+    resolveBet,
     getState() {
       return lastState;
     },
