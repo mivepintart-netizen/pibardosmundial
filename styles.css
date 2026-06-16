@@ -723,6 +723,20 @@ body::before {
   border-color: var(--red-border);
 }
 
+.btn-resolve.win.active {
+  background: var(--green-bg);
+  border-color: var(--green-border);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.btn-resolve.lose.active {
+  background: var(--red-bg);
+  border-color: var(--red-border);
+  opacity: 0.55;
+  cursor: default;
+}
+
 /* ---- Empty State ---- */
 .empty-state {
   text-align: center;

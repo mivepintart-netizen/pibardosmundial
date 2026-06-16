@@ -574,14 +574,10 @@
               : "perdido"
           }</div>
         </div>
-        ${
-          bet.estado === "pendiente"
-            ? `<div class="bet-resolve">
-                <button class="btn-resolve win" data-row="${bet.sheetRow}" data-estado="ganada" title="Marcar como ganada">✅</button>
-                <button class="btn-resolve lose" data-row="${bet.sheetRow}" data-estado="perdida" title="Marcar como perdida">❌</button>
-              </div>`
-            : ""
-        }
+        <div class="bet-resolve">
+          <button class="btn-resolve win${bet.estado === "ganada" ? " active" : ""}" data-row="${bet.sheetRow}" data-estado="ganada" title="Marcar como ganada">✅</button>
+          <button class="btn-resolve lose${bet.estado === "perdida" ? " active" : ""}" data-row="${bet.sheetRow}" data-estado="perdida" title="Marcar como perdida">❌</button>
+        </div>
       </div>`
       )
       .join("");
@@ -673,6 +669,7 @@
     dom.betsList.addEventListener("click", (e) => {
       const btn = e.target.closest(".btn-resolve");
       if (!btn) return;
+      if (btn.classList.contains("active")) return; // ya está en ese estado
       handleResolveBet(parseInt(btn.dataset.row, 10), btn.dataset.estado);
     });
 
