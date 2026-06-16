@@ -23,14 +23,14 @@
  * para que los cambios se publiquen (guardar solo no actualiza la URL ya publicada).
  */
 
-function doPost(e) {
+function doGet(e) {
   try {
-    const data = JSON.parse(e.postData.contents);
+    const params = e.parameter;
 
-    const partido = String(data.partido || "").trim();
-    const apuesta = String(data.apuesta || "").trim();
-    const cuota = Number(data.cuota);
-    const importe = Number(data.importe);
+    const partido = String(params.partido || "").trim();
+    const apuesta = String(params.apuesta || "").trim();
+    const cuota = Number(params.cuota);
+    const importe = Number(params.importe);
 
     if (!partido || !apuesta || !cuota || !importe) {
       return jsonResponse({ ok: false, error: "Faltan campos obligatorios" });

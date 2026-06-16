@@ -223,18 +223,24 @@
       );
     }
 
-    // Los Web Apps de Apps Script no añaden cabeceras CORS, así que el
-    // navegador nunca nos deja LEER la respuesta aunque la petición sí
-    // llegue y se guarde bien. Usamos "no-cors": enviamos los datos a
-    // ciegas y confiamos en que llegaron si fetch no lanza un error de
-    // red de verdad (sin internet, URL mal escrita, etc). El siguiente
-    // sync (o el botón de refrescar) confirma si realmente se guardó,
-    // porque la apuesta nueva aparecerá en la lista.
-    await fetch(CONFIG.APPS_SCRIPT_URL, {
-      method: "POST",
+    // IMPORTANTE: usamos GET con los datos en la URL, no POST con un body.
+    // Los Web Apps de Apps Script responden con una redirección (302), y al
+    // seguirla los navegadores convierten automáticamente un POST en GET
+    // perdiendo los datos por el camino. Con GET desde el principio no hay
+    // ese problema. Tampoco podemos leer la respuesta (Apps Script no manda
+    // cabeceras CORS), así que mandamos a ciegas y confiamos en que llegó
+    // si fetch no lanza un error de red real; el siguiente sync (o el botón
+    // de refrescar) confirma si se guardó de verdad.
+    const params = new URLSearchParams({
+      partido: payload.partido,
+      apuesta: payload.apuesta,
+      cuota: payload.cuota,
+      importe: payload.importe,
+    });
+
+    await fetch(`${CONFIG.APPS_SCRIPT_URL}?${params.toString()}`, {
+      method: "GET",
       mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
     });
 
     return null;
