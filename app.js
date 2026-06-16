@@ -721,14 +721,14 @@
     try {
       await SheetSync.submitBet(payload);
       closeAddModal();
-      showToast("📤", "Apuesta enviada, sincronizando…", "success");
+      showToast("📤", "Apuesta enviada, comprobando en unos segundos…", "success");
       // Pequeño margen para que el Sheet refleje el cambio antes de refrescar
       setTimeout(() => SheetSync.refreshNow(), 2500);
     } catch (err) {
       console.error("Error añadiendo apuesta:", err);
       showToast(
         "⚠️",
-        "No se pudo guardar. Revisa la conexión con el Sheet (¿configuraste APPS_SCRIPT_URL en sheets.js?)",
+        "No se pudo enviar (sin conexión). Inténtalo de nuevo.",
         "error"
       );
     } finally {

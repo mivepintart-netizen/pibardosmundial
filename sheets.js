@@ -223,25 +223,21 @@
       );
     }
 
-    // Usamos text/plain para evitar el preflight de CORS; el Apps Script
-    // hace JSON.parse(e.postData.contents) igualmente.
-    const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    // Los Web Apps de Apps Script no añaden cabeceras CORS, así que el
+    // navegador nunca nos deja LEER la respuesta aunque la petición sí
+    // llegue y se guarde bien. Usamos "no-cors": enviamos los datos a
+    // ciegas y confiamos en que llegaron si fetch no lanza un error de
+    // red de verdad (sin internet, URL mal escrita, etc). El siguiente
+    // sync (o el botón de refrescar) confirma si realmente se guardó,
+    // porque la apuesta nueva aparecerá en la lista.
+    await fetch(CONFIG.APPS_SCRIPT_URL, {
       method: "POST",
+      mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) throw new Error("El Apps Script respondió HTTP " + res.status);
-
-    try {
-      const data = await res.json();
-      if (data && data.ok === false) throw new Error(data.error || "Error desconocido del Apps Script");
-      return data;
-    } catch (e) {
-      // Si no se puede leer/parsear la respuesta (a veces pasa por CORS),
-      // no lo tratamos como fallo: el siguiente sync confirmará si se guardó.
-      return null;
-    }
+    return null;
   }
 
   // ---- API pública ----
