@@ -88,9 +88,13 @@
         state = payload;
         renderAll();
         lastSyncAt = Date.now();
+        dom.syncBadge.title = "Estado de sincronización con Google Sheets";
         setSyncBadge("ok", "Sincronizado ahora");
       } else if (event === "sync-error") {
-        setSyncBadge("error", "Sin conexión con el Sheet");
+        setSyncBadge("error", "No se pudo sincronizar");
+        if (payload && payload.message) {
+          dom.syncBadge.title = payload.message;
+        }
       } else if (event === "new-bets") {
         const n = payload.length;
         showToast(

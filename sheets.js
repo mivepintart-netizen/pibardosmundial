@@ -15,16 +15,17 @@
   // ---- Configuración ----
   const CONFIG = {
     SHEET_ID: "1fArzmnr_DomX_IowuOGmkW091O9fgL4Vwqdc7eMak78",
-    GID: 0, // índice de la pestaña (0 = la primera). Cambia esto si usas otra pestaña.
+    GID: null, // null = la primera pestaña visible (no asumimos un id concreto)
     POLL_INTERVAL_MS: 45000, // entre 30 y 60 segundos
   };
 
   function sheetUrl() {
     // El "_=" al final evita que el navegador devuelva una respuesta cacheada
-    return (
-      `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq` +
-      `?tqx=out:json&gid=${CONFIG.GID}&_=${Date.now()}`
-    );
+    let url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:json&_=${Date.now()}`;
+    if (CONFIG.GID !== null && CONFIG.GID !== undefined) {
+      url += `&gid=${CONFIG.GID}`;
+    }
+    return url;
   }
 
   // ---- Helpers de parseo ----
@@ -87,16 +88,19 @@
     const rows = table.rows || [];
 
     // --- Bote inicial ---
-    let boteInicial = 0;
     const botePos = findLabel(rows, "BOTE");
-    if (botePos) {
-      boteInicial = toNumber(cellValue(rows[botePos.r], botePos.c + 1));
+    if (!botePos) {
+      throw new Error('No encuentro la celda "BOTE" en el Sheet (¿pestaña o estructura distinta?)');
     }
+    const boteInicial = toNumber(cellValue(rows[botePos.r], botePos.c + 1));
 
     // --- Apuestas (tabla Partido | Apuesta | Cuota | Importe | Posible Ganancia | Status) ---
-    const apuestas = [];
     const partidoPos = findLabel(rows, "Partido");
-    if (partidoPos) {
+    if (!partidoPos) {
+      throw new Error('No encuentro la cabecera "Partido" en el Sheet (¿pestaña o estructura distinta?)');
+    }
+    const apuestas = [];
+    {
       let r = partidoPos.r + 1;
       let autoId = 1;
       while (r < rows.length) {
