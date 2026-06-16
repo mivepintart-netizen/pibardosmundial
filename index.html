@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Tracker de apuestas deportivas del Mundial 2026 - Controla tu bote, apuestas y ganancias con tu grupo de amigos">
-<title>🏆 Mundial 2026 — Bet Tracker</title>
+<meta name="description" content="Tracker de apuestas deportivas del Mundial - Controla tu bote, apuestas y ganancias con tu grupo de amigos">
+<title>🏆 Mundial Pibardos — Bet Tracker</title>
 <link rel="stylesheet" href="styles.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
 </head>
@@ -15,7 +15,7 @@
 <div class="logo">
 <span class="logo-icon">🏆</span>
 <div>
-<h1>Mundial 2026</h1>
+<h1>Mundial Pibardos</h1>
 <p class="subtitle">Bet Tracker</p>
 </div>
 </div>
@@ -28,9 +28,9 @@
 <button class="btn btn-gold" id="btn-share" title="Compartir resumen por WhatsApp">
 <span>📱</span> Compartir
 </button>
-<a class="btn btn-primary" id="btn-add" href="https://docs.google.com/spreadsheets/d/1fArzmnr_DomX_IowuOGmkW091O9fgL4Vwqdc7eMak78/edit" title="Añadir una apuesta nueva en el Google Sheet" target="_blank" rel="noopener">
+<button class="btn btn-primary" id="btn-add" title="Añadir una apuesta nueva">
 <span>＋</span> Nueva Apuesta
-</a>
+</button>
 </div>
 </div>
 </header>
@@ -92,6 +92,19 @@
 </div>
 </section>
 
+<!-- ======== CHART ======== -->
+<section class="chart-section">
+<div class="chart-card">
+<div class="chart-header">
+<span class="chart-title">📈 Evolución del dinero</span>
+<span class="chart-current" id="chart-current">0,00 €</span>
+</div>
+<div class="chart-svg-wrapper" id="chart-wrapper">
+<!-- Rendered by JS -->
+</div>
+</div>
+</section>
+
 <!-- ======== FILTERS ======== -->
 <section class="filters">
 <div class="filter-group" id="filter-group">
@@ -118,20 +131,59 @@
 <div class="section-header">
 <h2>👥 Participantes</h2>
 </div>
-<div class="participants-grid" id="participants-grid">
+<div class="participants-summary" id="participants-summary">
 <!-- Rendered by JS -->
 </div>
 </section>
 
 <!-- ======== DATA BAR ======== -->
 <div class="data-bar">
-<span class="data-bar-note">Los datos vienen del Google Sheet del grupo. Para añadir o corregir una apuesta, edítala ahí.</span>
+<span class="data-bar-note">Las apuestas se guardan en el Google Sheet del grupo. Puedes añadirlas desde aquí o editarlas directamente ahí.</span>
 <button class="btn btn-sm btn-secondary" id="btn-export" title="Exportar datos como JSON">
 📥 Exportar
 </button>
 </div>
 
 </main>
+
+<!-- ======== ADD BET MODAL ======== -->
+<div class="modal-overlay" id="modal-overlay">
+<div class="modal">
+<div class="modal-header">
+<h3>＋ Nueva Apuesta</h3>
+<button class="modal-close" id="modal-close">&times;</button>
+</div>
+<form id="bet-form">
+<div class="form-group">
+<label>Partido</label>
+<input type="text" id="input-partido" placeholder="Ej. España - Francia" required>
+</div>
+<div class="form-group">
+<label>Apuesta</label>
+<input type="text" id="input-apuesta" placeholder="Ej. Gana España" required>
+</div>
+<div class="form-row">
+<div class="form-group">
+<label>Cuota</label>
+<input type="number" id="input-cuota" step="0.01" min="1" placeholder="1.86" required>
+</div>
+<div class="form-group">
+<label>Importe (€)</label>
+<input type="number" id="input-importe" step="1" min="1" placeholder="10" required>
+</div>
+</div>
+<div class="form-preview">
+<span class="preview-label">Posible ganancia</span>
+<span class="preview-value" id="preview-ganancia">0,00 €</span>
+</div>
+<p class="form-note">Se añadirá directamente al Google Sheet del grupo como pendiente.</p>
+<div class="form-actions">
+<button type="button" class="btn btn-secondary" id="btn-cancel">Cancelar</button>
+<button type="submit" class="btn btn-primary" id="btn-submit">Guardar</button>
+</div>
+</form>
+</div>
+</div>
 
 <!-- ======== SHARE MODAL ======== -->
 <div class="modal-overlay" id="share-overlay">
@@ -158,7 +210,8 @@
 
 <!-- ======== FOOTER ======== -->
 <footer class="footer">
-<p>Mundial 2026 Bet Tracker 🏆 • Hecho para la peña</p>
+<p>Mundial Pibardos 🏆 • Hecho para la peña</p>
+<p class="footer-credit">Creado por Cejitas</p>
 </footer>
 
 <script src="data.js"></script>

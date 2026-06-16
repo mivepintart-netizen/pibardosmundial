@@ -17,6 +17,11 @@
     SHEET_ID: "1fArzmnr_DomX_IowuOGmkW091O9fgL4Vwqdc7eMak78",
     GID: null, // null = la primera pestaña visible (no asumimos un id concreto)
     POLL_INTERVAL_MS: 45000, // entre 30 y 60 segundos
+
+    // URL del Web App de Google Apps Script (ver Code.gs) que permite AÑADIR
+    // apuestas desde la web. Tienes que desplegarlo tú y pegar la URL aquí.
+    // Instrucciones en el mensaje / README que acompaña a este código.
+    APPS_SCRIPT_URL: "PEGA_AQUI_LA_URL_DE_TU_APPS_SCRIPT",
   };
 
   function sheetUrl() {
@@ -208,6 +213,37 @@
     console.log("[SheetSync] Apuestas nuevas detectadas (canal externo pendiente de conectar):", newBets);
   }
 
+  // ============================================================
+  // Añadir una apuesta nueva desde la web (escribe en el Sheet)
+  // ============================================================
+  async function submitBet(payload) {
+    if (!CONFIG.APPS_SCRIPT_URL || CONFIG.APPS_SCRIPT_URL.includes("PEGA_AQUI")) {
+      throw new Error(
+        "Falta configurar APPS_SCRIPT_URL en sheets.js (despliega el Apps Script y pega la URL)"
+      );
+    }
+
+    // Usamos text/plain para evitar el preflight de CORS; el Apps Script
+    // hace JSON.parse(e.postData.contents) igualmente.
+    const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) throw new Error("El Apps Script respondió HTTP " + res.status);
+
+    try {
+      const data = await res.json();
+      if (data && data.ok === false) throw new Error(data.error || "Error desconocido del Apps Script");
+      return data;
+    } catch (e) {
+      // Si no se puede leer/parsear la respuesta (a veces pasa por CORS),
+      // no lo tratamos como fallo: el siguiente sync confirmará si se guardó.
+      return null;
+    }
+  }
+
   // ---- API pública ----
   window.SheetSync = {
     init() {
@@ -220,6 +256,7 @@
     refreshNow() {
       return syncOnce();
     },
+    submitBet,
     getState() {
       return lastState;
     },

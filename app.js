@@ -42,7 +42,11 @@
     // Lists
     betsList: $("#bets-list"),
     betCount: $("#bet-count"),
-    participantsGrid: $("#participants-grid"),
+    participantsSummary: $("#participants-summary"),
+
+    // Chart
+    chartWrapper: $("#chart-wrapper"),
+    chartCurrent: $("#chart-current"),
 
     // Filters
     filterGroup: $("#filter-group"),
@@ -53,6 +57,18 @@
     syncText: $("#sync-text"),
     btnRefresh: $("#btn-refresh"),
 
+    // Add Bet Modal
+    modalOverlay: $("#modal-overlay"),
+    modalClose: $("#modal-close"),
+    betForm: $("#bet-form"),
+    inputPartido: $("#input-partido"),
+    inputApuesta: $("#input-apuesta"),
+    inputCuota: $("#input-cuota"),
+    inputImporte: $("#input-importe"),
+    previewGanancia: $("#preview-ganancia"),
+    btnCancel: $("#btn-cancel"),
+    btnSubmit: $("#btn-submit"),
+
     // Share Modal
     shareOverlay: $("#share-overlay"),
     shareClose: $("#share-close"),
@@ -61,6 +77,7 @@
     btnWhatsapp: $("#btn-whatsapp"),
 
     // Buttons
+    btnAdd: $("#btn-add"),
     btnShare: $("#btn-share"),
     btnExport: $("#btn-export"),
 
@@ -216,6 +233,7 @@
   function renderAll() {
     renderStats();
     renderBalanceBar();
+    renderChart();
     renderBets();
     renderParticipants();
   }
@@ -240,11 +258,12 @@
 
   function renderBalanceBar() {
     const s = calcStats();
-    const total = s.boteInicial + s.totalGanado;
+    const netProfit = s.totalGanado - s.ganadasStakes; // beneficio neto: sin contar lo apostado
+    const total = s.boteInicial + netProfit;
 
     // Proportions relative to total money that has "passed through"
     const pctLost = total > 0 ? (s.totalPerdido / total) * 100 : 0;
-    const pctWon = total > 0 ? (s.totalGanado / total) * 100 : 0;
+    const pctWon = total > 0 ? (netProfit / total) * 100 : 0;
     const pctRemaining = Math.max(0, 100 - pctLost - pctWon);
 
     dom.barFillSpent.style.width = pctLost + "%";
@@ -252,10 +271,97 @@
     dom.barFillRemaining.style.width = pctRemaining + "%";
 
     dom.barLost.textContent = formatEuroShort(s.totalPerdido);
-    dom.barWon.textContent = formatEuroShort(s.totalGanado);
+    dom.barWon.textContent = formatEuroShort(netProfit);
     dom.barAvailable.textContent = formatEuroShort(
       Math.max(0, s.dineroActual)
     );
+  }
+
+  // ---- Chart: evolución del dinero ----
+  // Niveles de referencia personalizados del grupo
+  const CHART_LEVELS = [
+    { value: 0, label: "Ruina" },
+    { value: 310, label: "Cubatas" },
+    { value: 350, label: "Comida" },
+    { value: 400, label: "Comida + Cubatas" },
+  ];
+
+  function buildHistorial() {
+    // Reconstruye cómo ha ido evolucionando el dinero actual a medida que se
+    // van resolviendo apuestas, en el mismo orden en que están en el Sheet.
+    let running = state.boteInicial;
+    const puntos = [running];
+    state.apuestas.forEach((a) => {
+      if (a.estado === "ganada") running += a.posibleGanancia - a.importe;
+      else if (a.estado === "perdida") running -= a.importe;
+      // pendiente: no cambia el dinero actual todavía
+      puntos.push(running);
+    });
+    return puntos;
+  }
+
+  function renderChart() {
+    const puntos = buildHistorial();
+    const actual = puntos[puntos.length - 1];
+    dom.chartCurrent.textContent = formatEuroShort(actual);
+
+    const W = 700;
+    const H = 220;
+    const PAD_L = 14;
+    const PAD_R = 14;
+    const PAD_T = 18;
+    const PAD_B = 28;
+
+    // Calculamos el máximo real alcanzado para poner ahí "Casa Matiki"
+    const maxAlcanzado = Math.max(...puntos, ...CHART_LEVELS.map((l) => l.value));
+    const minAlcanzado = Math.min(...puntos, 0);
+
+    const niveles = [...CHART_LEVELS];
+    if (maxAlcanzado > 400) {
+      niveles.push({ value: maxAlcanzado, label: "🏆 Casa Matiki" });
+    }
+
+    const yMax = maxAlcanzado * 1.08 || 10;
+    const yMin = Math.min(0, minAlcanzado);
+    const range = yMax - yMin || 1;
+
+    const xFor = (i) =>
+      puntos.length > 1
+        ? PAD_L + (i / (puntos.length - 1)) * (W - PAD_L - PAD_R)
+        : PAD_L;
+    const yFor = (v) => PAD_T + (1 - (v - yMin) / range) * (H - PAD_T - PAD_B);
+
+    // Líneas de referencia
+    const gridLines = niveles
+      .map((nivel) => {
+        const y = yFor(nivel.value);
+        return `
+          <line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" class="chart-gridline" />
+          <text x="${PAD_L}" y="${y - 4}" class="chart-gridlabel">${escapeHtml(
+          nivel.label
+        )} · ${formatEuroShort(nivel.value)}</text>
+        `;
+      })
+      .join("");
+
+    // Línea de la evolución
+    const linePoints = puntos.map((v, i) => `${xFor(i)},${yFor(v)}`).join(" ");
+    const areaPoints = `${PAD_L},${yFor(yMin)} ${linePoints} ${xFor(
+      puntos.length - 1
+    )},${yFor(yMin)}`;
+
+    const lineColor = actual >= state.boteInicial ? "var(--green)" : "var(--red)";
+
+    dom.chartWrapper.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" class="chart-svg" preserveAspectRatio="none">
+        ${gridLines}
+        <polygon points="${areaPoints}" class="chart-area" fill="${lineColor}" />
+        <polyline points="${linePoints}" class="chart-line" stroke="${lineColor}" />
+        <circle cx="${xFor(puntos.length - 1)}" cy="${yFor(
+      actual
+    )}" r="4.5" class="chart-dot" fill="${lineColor}" />
+      </svg>
+    `;
   }
 
   function renderBets() {
@@ -333,45 +439,30 @@
 
   function renderParticipants() {
     const s = calcStats();
+    const aportacion = state.participantes[0]?.aportacion || 0;
+    const balancePorPersona = s.aRepartir - aportacion;
 
-    // Clasificación: ordenamos por balance individual (aRepartir - aportación) descendente
-    const ranked = [...state.participantes]
-      .map((p) => ({ ...p, balance: s.aRepartir - p.aportacion }))
-      .sort((a, b) => b.balance - a.balance);
-
-    const medal = (pos) => (pos === 0 ? "🥇 " : pos === 1 ? "🥈 " : pos === 2 ? "🥉 " : "");
-
-    dom.participantsGrid.innerHTML = ranked
-      .map(
-        (p, idx) => `
-      <div class="participant-card">
-        <div class="participant-avatar avatar-${(idx % 9) + 1}">
-          ${p.nombre.charAt(0).toUpperCase()}
+    dom.participantsSummary.innerHTML = `
+      <div class="participants-summary-card">
+        <div class="participants-summary-item">
+          <span class="participants-summary-value">${s.numParticipantes}</span>
+          <span class="participants-summary-label">participantes</span>
         </div>
-        <div class="participant-name">${medal(idx)}${escapeHtml(p.nombre)}</div>
-        <div class="participant-stats">
-          <div class="participant-stat">
-            <span class="participant-stat-label">Aportó</span>
-            <span class="participant-stat-value">${formatEuroShort(
-              p.aportacion
-            )}</span>
-          </div>
-          <div class="participant-stat">
-            <span class="participant-stat-label">A repartir</span>
-            <span class="participant-stat-value ${
-              s.aRepartir >= p.aportacion ? "positive" : "negative"
-            }">${formatEuroShort(s.aRepartir)}</span>
-          </div>
-          <div class="participant-stat">
-            <span class="participant-stat-label">Balance</span>
-            <span class="participant-stat-value ${
-              p.balance >= 0 ? "positive" : "negative"
-            }">${p.balance >= 0 ? "+" : ""}${formatEuroShort(p.balance)}</span>
-          </div>
+        <div class="participants-summary-item">
+          <span class="participants-summary-value">${formatEuroShort(aportacion)}</span>
+          <span class="participants-summary-label">aportó cada uno</span>
         </div>
-      </div>`
-      )
-      .join("");
+        <div class="participants-summary-item">
+          <span class="participants-summary-value">${formatEuroShort(s.aRepartir)}</span>
+          <span class="participants-summary-label">a repartir cada uno</span>
+        </div>
+        <div class="participants-summary-item">
+          <span class="participants-summary-value ${
+            balancePorPersona >= 0 ? "positive" : "negative"
+          }">${balancePorPersona >= 0 ? "+" : ""}${formatEuroShort(balancePorPersona)}</span>
+          <span class="participants-summary-label">balance por persona</span>
+        </div>
+      </div>`;
   }
 
   // ---- Helpers ----
@@ -396,6 +487,17 @@
 
   // ---- Event Binding ----
   function bindEvents() {
+    // Add bet modal
+    dom.btnAdd.addEventListener("click", () => openAddModal());
+    dom.modalClose.addEventListener("click", () => closeAddModal());
+    dom.btnCancel.addEventListener("click", () => closeAddModal());
+    dom.modalOverlay.addEventListener("click", (e) => {
+      if (e.target === dom.modalOverlay) closeAddModal();
+    });
+    dom.inputCuota.addEventListener("input", updateGananciaPreview);
+    dom.inputImporte.addEventListener("input", updateGananciaPreview);
+    dom.betForm.addEventListener("submit", handleAddFormSubmit);
+
     dom.shareClose.addEventListener("click", () => closeShareModal());
     dom.shareOverlay.addEventListener("click", (e) => {
       if (e.target === dom.shareOverlay) closeShareModal();
@@ -427,9 +529,64 @@
     // Keyboard shortcuts
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
+        closeAddModal();
         closeShareModal();
       }
     });
+  }
+
+  // ---- Add Bet Modal ----
+  function openAddModal() {
+    dom.betForm.reset();
+    dom.previewGanancia.textContent = "0,00 €";
+    dom.modalOverlay.classList.add("active");
+  }
+
+  function closeAddModal() {
+    dom.modalOverlay.classList.remove("active");
+  }
+
+  function updateGananciaPreview() {
+    const cuota = parseFloat(dom.inputCuota.value) || 0;
+    const importe = parseFloat(dom.inputImporte.value) || 0;
+    dom.previewGanancia.textContent = formatEuroShort(cuota * importe);
+  }
+
+  async function handleAddFormSubmit(e) {
+    e.preventDefault();
+
+    const payload = {
+      partido: dom.inputPartido.value.trim(),
+      apuesta: dom.inputApuesta.value.trim(),
+      cuota: parseFloat(dom.inputCuota.value),
+      importe: parseFloat(dom.inputImporte.value),
+    };
+
+    if (!payload.partido || !payload.apuesta || !payload.cuota || !payload.importe) {
+      showToast("⚠️", "Rellena todos los campos", "error");
+      return;
+    }
+
+    dom.btnSubmit.disabled = true;
+    dom.btnSubmit.textContent = "Guardando…";
+
+    try {
+      await SheetSync.submitBet(payload);
+      closeAddModal();
+      showToast("📤", "Apuesta enviada, sincronizando…", "success");
+      // Pequeño margen para que el Sheet refleje el cambio antes de refrescar
+      setTimeout(() => SheetSync.refreshNow(), 2500);
+    } catch (err) {
+      console.error("Error añadiendo apuesta:", err);
+      showToast(
+        "⚠️",
+        "No se pudo guardar. Revisa la conexión con el Sheet (¿configuraste APPS_SCRIPT_URL en sheets.js?)",
+        "error"
+      );
+    } finally {
+      dom.btnSubmit.disabled = false;
+      dom.btnSubmit.textContent = "Guardar";
+    }
   }
 
   // ---- Share Functions ----
