@@ -21,7 +21,7 @@
     // URL del Web App de Google Apps Script (ver Code.gs) que permite AÑADIR
     // apuestas desde la web. Tienes que desplegarlo tú y pegar la URL aquí.
     // Instrucciones en el mensaje / README que acompaña a este código.
-    APPS_SCRIPT_URL: "PEGA_AQUI_LA_URL_DE_TU_APPS_SCRIPT",
+    APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzMQXduNmadb85JoN-CheG5QQRey87zatz0-GG1wryj47R8IlY9XiuxqH5SFbiGAz0z0Q/exec",
   };
 
   function sheetUrl() {
