@@ -43,12 +43,18 @@
   }
 
   function normalizeStatus(raw) {
-    if (!raw) return "pendiente";
+    // La columna de estado puede ser una casilla (true/false) o texto.
+    // Importante: una casilla NUNCA puede estar "vacía" para Google, así que
+    // con casillas no se puede distinguir "pendiente" de "perdida" todavía.
+    if (raw === true) return "ganada";
+    if (raw === false) return "perdida";
+    if (raw === null || raw === undefined || raw === "") return "pendiente";
+
     const s = String(raw).trim().toLowerCase();
-    if (["ganada", "ganado", "gano", "ganó", "won", "win", "✅"].some((k) => s.includes(k))) {
+    if (["ganada", "ganado", "gano", "ganó", "won", "win", "true", "✅"].some((k) => s.includes(k))) {
       return "ganada";
     }
-    if (["perdida", "perdido", "lost", "❌"].some((k) => s.includes(k))) {
+    if (["perdida", "perdido", "lost", "false", "❌"].some((k) => s.includes(k))) {
       return "perdida";
     }
     return "pendiente";
@@ -87,18 +93,21 @@
   function parseSheetState(table) {
     const rows = table.rows || [];
 
-    // --- Bote inicial ---
-    const botePos = findLabel(rows, "BOTE");
-    if (!botePos) {
-      throw new Error('No encuentro la celda "BOTE" en el Sheet (¿pestaña o estructura distinta?)');
-    }
-    const boteInicial = toNumber(cellValue(rows[botePos.r], botePos.c + 1));
-
     // --- Apuestas (tabla Partido | Apuesta | Cuota | Importe | Posible Ganancia | Status) ---
     const partidoPos = findLabel(rows, "Partido");
     if (!partidoPos) {
       throw new Error('No encuentro la cabecera "Partido" en el Sheet (¿pestaña o estructura distinta?)');
     }
+
+    // --- Bote inicial ---
+    // OJO: la celda de texto "BOTE" vive en la misma columna que las Cuotas
+    // (números), así que Google la trata como columna numérica y anula el
+    // texto "BOTE" (lo convierte en null). Por eso no podemos buscarlo por
+    // etiqueta: leemos directamente la fila 1, en la misma columna que
+    // "Importe" (3 columnas a la derecha de "Partido"), que es donde tu
+    // plantilla pone siempre el valor del bote.
+    const boteInicial = toNumber(cellValue(rows[0], partidoPos.c + 3));
+
     const apuestas = [];
     {
       let r = partidoPos.r + 1;
