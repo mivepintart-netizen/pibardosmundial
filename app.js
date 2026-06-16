@@ -48,6 +48,10 @@
     chartWrapper: $("#chart-wrapper"),
     chartCurrent: $("#chart-current"),
 
+    // Achievements
+    achievementsSection: $("#achievements-section"),
+    achievementsList: $("#achievements-list"),
+
     // Filters
     filterGroup: $("#filter-group"),
 
@@ -234,6 +238,7 @@
     renderStats();
     renderBalanceBar();
     renderChart();
+    renderAchievements();
     renderBets();
     renderParticipants();
   }
@@ -287,81 +292,219 @@
   ];
 
   function buildHistorial() {
-    // Reconstruye cómo ha ido evolucionando el dinero actual a medida que se
-    // van resolviendo apuestas, en el mismo orden en que están en el Sheet.
+    // Solo las apuestas YA RESUELTAS mueven la gráfica (las pendientes no
+    // cambian el dinero actual todavía, así que no generan punto nuevo).
     let running = state.boteInicial;
-    const puntos = [running];
+    const puntos = [{ valor: running, label: "Inicio", delta: 0, estado: "inicio" }];
     state.apuestas.forEach((a) => {
-      if (a.estado === "ganada") running += a.posibleGanancia - a.importe;
-      else if (a.estado === "perdida") running -= a.importe;
-      // pendiente: no cambia el dinero actual todavía
-      puntos.push(running);
+      if (a.estado === "pendiente") return;
+      const delta = a.estado === "ganada" ? a.posibleGanancia - a.importe : -a.importe;
+      running += delta;
+      puntos.push({ valor: running, label: a.partido, delta, estado: a.estado });
     });
     return puntos;
   }
 
+  // Convierte una serie de puntos {x,y} en un path SVG suave (Catmull-Rom -> Bézier)
+  function smoothPath(pts) {
+    if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i === 0 ? i : i - 1];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+    }
+    return d;
+  }
+
   function renderChart() {
-    const puntos = buildHistorial();
-    const actual = puntos[puntos.length - 1];
+    const historial = buildHistorial();
+    const actual = historial[historial.length - 1].valor;
     dom.chartCurrent.textContent = formatEuroShort(actual);
+    dom.chartCurrent.className = "chart-current " + (actual >= state.boteInicial ? "positive" : "negative");
 
     const W = 700;
-    const H = 220;
-    const PAD_L = 14;
-    const PAD_R = 14;
-    const PAD_T = 18;
-    const PAD_B = 28;
+    const H = 240;
+    const PAD_L = 16;
+    const PAD_R = 16;
+    const PAD_T = 24;
+    const PAD_B = 16;
 
-    // Calculamos el máximo real alcanzado para poner ahí "Casa Matiki"
-    const maxAlcanzado = Math.max(...puntos, ...CHART_LEVELS.map((l) => l.value));
-    const minAlcanzado = Math.min(...puntos, 0);
+    const valores = historial.map((p) => p.valor);
+    const maxAlcanzado = Math.max(...valores, ...CHART_LEVELS.map((l) => l.value));
+    const minAlcanzado = Math.min(...valores, 0);
 
     const niveles = [...CHART_LEVELS];
     if (maxAlcanzado > 400) {
       niveles.push({ value: maxAlcanzado, label: "🏆 Casa Matiki" });
     }
 
-    const yMax = maxAlcanzado * 1.08 || 10;
-    const yMin = Math.min(0, minAlcanzado);
+    const yMax = maxAlcanzado * 1.1 || 10;
+    const yMin = minAlcanzado < 0 ? minAlcanzado * 1.1 : 0;
     const range = yMax - yMin || 1;
 
     const xFor = (i) =>
-      puntos.length > 1
-        ? PAD_L + (i / (puntos.length - 1)) * (W - PAD_L - PAD_R)
-        : PAD_L;
+      historial.length > 1
+        ? PAD_L + (i / (historial.length - 1)) * (W - PAD_L - PAD_R)
+        : (PAD_L + (W - PAD_R)) / 2;
     const yFor = (v) => PAD_T + (1 - (v - yMin) / range) * (H - PAD_T - PAD_B);
 
-    // Líneas de referencia
+    // Líneas de referencia personalizadas (Ruina, Cubatas, Comida...)
     const gridLines = niveles
       .map((nivel) => {
         const y = yFor(nivel.value);
         return `
-          <line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" class="chart-gridline" />
-          <text x="${PAD_L}" y="${y - 4}" class="chart-gridlabel">${escapeHtml(
-          nivel.label
-        )} · ${formatEuroShort(nivel.value)}</text>
+          <line x1="${PAD_L}" y1="${y.toFixed(2)}" x2="${W - PAD_R}" y2="${y.toFixed(2)}" class="chart-gridline" />
+          <text x="${PAD_L}" y="${(y - 5).toFixed(2)}" class="chart-gridlabel">${escapeHtml(nivel.label)} · ${formatEuroShort(nivel.value)}</text>
         `;
       })
       .join("");
 
-    // Línea de la evolución
-    const linePoints = puntos.map((v, i) => `${xFor(i)},${yFor(v)}`).join(" ");
-    const areaPoints = `${PAD_L},${yFor(yMin)} ${linePoints} ${xFor(
-      puntos.length - 1
-    )},${yFor(yMin)}`;
+    // Línea base: el bote inicial, para ver de un vistazo si vais ganando o perdiendo
+    const baseY = yFor(state.boteInicial);
+    const baseLine = `
+      <line x1="${PAD_L}" y1="${baseY.toFixed(2)}" x2="${W - PAD_R}" y2="${baseY.toFixed(2)}" class="chart-baseline" />
+    `;
+
+    const pts = historial.map((p, i) => ({ x: xFor(i), y: yFor(p.valor), ...p }));
+    const linePath = smoothPath(pts);
+    const baseLineY = yFor(yMin);
+    const areaPath = `${linePath} L ${pts[pts.length - 1].x.toFixed(2)} ${baseLineY.toFixed(2)} L ${pts[0].x.toFixed(2)} ${baseLineY.toFixed(2)} Z`;
 
     const lineColor = actual >= state.boteInicial ? "var(--green)" : "var(--red)";
 
+    const dots = pts
+      .map((p, i) => {
+        const isLast = i === pts.length - 1;
+        const color =
+          p.estado === "ganada" ? "var(--green)" : p.estado === "perdida" ? "var(--red)" : "var(--gold-light)";
+        const tooltip =
+          p.estado === "inicio"
+            ? `Bote inicial: ${formatEuroShort(p.valor)}`
+            : `${p.label}: ${p.delta >= 0 ? "+" : ""}${formatEuroShort(p.delta)} → ${formatEuroShort(p.valor)}`;
+        return `
+          <circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${isLast ? 5.5 : 3.5}" fill="${color}" class="chart-dot${isLast ? " chart-dot-current" : ""}">
+            <title>${escapeHtml(tooltip)}</title>
+          </circle>
+        `;
+      })
+      .join("");
+
     dom.chartWrapper.innerHTML = `
       <svg viewBox="0 0 ${W} ${H}" class="chart-svg" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="chartFillGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${lineColor}" stop-opacity="0.32" />
+            <stop offset="100%" stop-color="${lineColor}" stop-opacity="0" />
+          </linearGradient>
+        </defs>
         ${gridLines}
-        <polygon points="${areaPoints}" class="chart-area" fill="${lineColor}" />
-        <polyline points="${linePoints}" class="chart-line" stroke="${lineColor}" />
-        <circle cx="${xFor(puntos.length - 1)}" cy="${yFor(
-      actual
-    )}" r="4.5" class="chart-dot" fill="${lineColor}" />
+        ${baseLine}
+        <path d="${areaPath}" fill="url(#chartFillGradient)" />
+        <path d="${linePath}" class="chart-line" stroke="${lineColor}" fill="none" />
+        ${dots}
       </svg>
     `;
+  }
+
+  // ---- Logros: rachas de aciertos / fallos ----
+  function calcAchievements() {
+    const resueltas = state.apuestas.filter(
+      (a) => a.estado === "ganada" || a.estado === "perdida"
+    );
+    const achievements = [];
+
+    // Racha actual, contando desde la apuesta más reciente hacia atrás
+    let currentStreak = 0;
+    let currentType = null;
+    for (let i = resueltas.length - 1; i >= 0; i--) {
+      const estado = resueltas[i].estado;
+      if (currentType === null) {
+        currentType = estado;
+        currentStreak = 1;
+      } else if (estado === currentType) {
+        currentStreak++;
+      } else {
+        break;
+      }
+    }
+
+    if (currentStreak >= 2) {
+      if (currentType === "ganada") {
+        const icon = currentStreak >= 5 ? "🔥🔥🔥" : currentStreak >= 3 ? "🔥" : "✌️";
+        const texto =
+          currentStreak >= 3
+            ? `¡RACHA DE ${currentStreak} ACIERTOS SEGUIDOS!`
+            : `${currentStreak} aciertos seguidos, vamos bien`;
+        achievements.push({ icon, texto, tipo: "positive" });
+      } else {
+        const icon = currentStreak >= 5 ? "💀💀💀" : currentStreak >= 3 ? "💀" : "😬";
+        const texto =
+          currentStreak >= 3
+            ? `RACHA DE ${currentStreak} FALLOS SEGUIDOS...`
+            : `${currentStreak} fallos seguidos, cuidado`;
+        achievements.push({ icon, texto, tipo: "negative" });
+      }
+    }
+
+    // Récords históricos de toda la temporada
+    let maxWin = 0,
+      maxLose = 0,
+      runWin = 0,
+      runLose = 0;
+    resueltas.forEach((a) => {
+      if (a.estado === "ganada") {
+        runWin++;
+        runLose = 0;
+        maxWin = Math.max(maxWin, runWin);
+      } else {
+        runLose++;
+        runWin = 0;
+        maxLose = Math.max(maxLose, runLose);
+      }
+    });
+
+    if (maxWin >= 3) {
+      achievements.push({
+        icon: "🏆",
+        texto: `Récord de la temporada: ${maxWin} aciertos seguidos`,
+        tipo: "record",
+      });
+    }
+    if (maxLose >= 3) {
+      achievements.push({
+        icon: "📉",
+        texto: `Peor racha de la temporada: ${maxLose} fallos seguidos`,
+        tipo: "record",
+      });
+    }
+
+    return achievements;
+  }
+
+  function renderAchievements() {
+    const achievements = calcAchievements();
+    if (achievements.length === 0) {
+      dom.achievementsSection.classList.remove("show");
+      dom.achievementsList.innerHTML = "";
+      return;
+    }
+    dom.achievementsSection.classList.add("show");
+    dom.achievementsList.innerHTML = achievements
+      .map(
+        (a) => `
+      <div class="achievement-badge ${a.tipo}">
+        <span class="achievement-icon">${a.icon}</span>
+        <span class="achievement-text">${escapeHtml(a.texto)}</span>
+      </div>`
+      )
+      .join("");
   }
 
   function renderBets() {
