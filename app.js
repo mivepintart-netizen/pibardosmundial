@@ -288,7 +288,6 @@
   }
 
   // ---- Chart: evolución del dinero ----
-  const CHART_LEVELS = [];
 
   function niceTicks(min, max, count) {
     const range = max - min || 1;
@@ -350,11 +349,16 @@
     const PAD_B = 16;
 
     const valores = historial.map((p) => p.valor);
-    const maxAlcanzado = Math.max(...valores, ...CHART_LEVELS.map((l) => l.value));
-    const minAlcanzado = Math.min(...valores, 0);
+    // Encuadramos el eje en la zona donde realmente se mueve el dinero
+    // (en vez de arrancar siempre desde 0), para que las subidas y bajadas
+    // se vean grandes y claras en vez de aplastadas contra el eje.
+    const dataMin = Math.min(...valores, state.boteInicial);
+    const dataMax = Math.max(...valores, state.boteInicial);
+    const dataRange = dataMax - dataMin || Math.max(dataMax * 0.1, 10);
+    const padding = dataRange * 0.25;
 
-    const yMax = maxAlcanzado * 1.1 || 10;
-    const yMin = minAlcanzado < 0 ? minAlcanzado * 1.1 : 0;
+    const yMax = dataMax + padding;
+    const yMin = dataMin - padding;
     const range = yMax - yMin || 1;
 
     const niveles = niceTicks(yMin, yMax, 4).map((value) => ({ value }));
