@@ -507,38 +507,6 @@
       }
     }
 
-    // Récords históricos de toda la temporada
-    let maxWin = 0,
-      maxLose = 0,
-      runWin = 0,
-      runLose = 0;
-    resueltas.forEach((a) => {
-      if (a.estado === "ganada") {
-        runWin++;
-        runLose = 0;
-        maxWin = Math.max(maxWin, runWin);
-      } else {
-        runLose++;
-        runWin = 0;
-        maxLose = Math.max(maxLose, runLose);
-      }
-    });
-
-    if (maxWin >= 3) {
-      achievements.push({
-        icon: "🏆",
-        texto: `Récord de la temporada: ${maxWin} aciertos seguidos. Estéticamente es una locura.`,
-        tipo: "record",
-      });
-    }
-    if (maxLose >= 3) {
-      achievements.push({
-        icon: "📉",
-        texto: `Peor racha de la temporada: ${maxLose} fallos seguidos. Para qué acertarla, pudiendo fallarla.`,
-        tipo: "record",
-      });
-    }
-
     return achievements;
   }
 
