@@ -424,6 +424,46 @@
   }
 
   // ---- Logros: rachas de aciertos / fallos ----
+  // Frases al estilo "La Sotanita" — algunas suyas reales, otras inventadas
+  // en su mismo tono, organizadas por tamaño de racha.
+  const FRASES_GANADA = {
+    1: ["Bien, una menos para la ruina", "Ahí la metiste, qué menos"],
+    2: ["2 aciertos seguidos, vamos bien", "Tu apuesta favorita ahora mismo: cualquiera de estas"],
+    3: [
+      "Estéticamente es una locura esta racha",
+      "Esto no es normal, eh",
+      "Métela tú que a mí me da la risa... y la metisteis",
+    ],
+    5: [
+      "Si seguís así hay que fundar una secta",
+      "Juega tú que me da la risa... de envidia",
+      "Tu delantero desfavorito ahora mismo: el que no apostó con vosotros",
+    ],
+  };
+
+  const FRASES_PERDIDA = {
+    1: ["Si fallas, ríete, que se rían tus colegas y ya está", "Volvió a rodar la cuadrada"],
+    2: ["Ponte las gafas, que no estáis acertando ni una", "2 fallos seguidos, cuidado"],
+    3: [
+      "Para qué acertarla, pudiendo fallarla",
+      "Aciértala tú que a mí me da la risa",
+      "Malas noticias para los amantes de las apuestas ganadoras",
+    ],
+    5: [
+      "Friégalo tú que a mí me da la risa, dijo el bote",
+      "Esto ya no es racha, es vocación",
+      "Para qué acertarla, pudiendo fallarla... otra vez",
+    ],
+  };
+
+  // Coge la frase de la categoría que corresponda según el tamaño de la racha
+  // (1, 2, 3 o 5+), rotando entre las disponibles de esa categoría.
+  function fraseParaRacha(pool, streak) {
+    const tier = streak >= 5 ? 5 : streak >= 3 ? 3 : streak >= 2 ? 2 : 1;
+    const opciones = pool[tier];
+    return opciones[streak % opciones.length];
+  }
+
   function calcAchievements() {
     const resueltas = state.apuestas.filter(
       (a) => a.estado === "ganada" || a.estado === "perdida"
@@ -445,20 +485,24 @@
       }
     }
 
-    if (currentStreak >= 2) {
+    if (currentStreak >= 1) {
       if (currentType === "ganada") {
-        const icon = currentStreak >= 5 ? "🔥🔥🔥" : currentStreak >= 3 ? "🔥" : "✌️";
+        const icon =
+          currentStreak >= 5 ? "🔥🔥🔥" : currentStreak >= 3 ? "🔥" : currentStreak >= 2 ? "✌️" : "👍";
+        const frase = fraseParaRacha(FRASES_GANADA, currentStreak);
         const texto =
-          currentStreak >= 3
-            ? `¡RACHA DE ${currentStreak} ACIERTOS SEGUIDOS!`
-            : `${currentStreak} aciertos seguidos, vamos bien`;
+          currentStreak >= 2
+            ? `${currentStreak} aciertos seguidos. "${frase}"`
+            : `"${frase}"`;
         achievements.push({ icon, texto, tipo: "positive" });
       } else {
-        const icon = currentStreak >= 5 ? "💀💀💀" : currentStreak >= 3 ? "💀" : "😬";
+        const icon =
+          currentStreak >= 5 ? "💀💀💀" : currentStreak >= 3 ? "💀" : currentStreak >= 2 ? "😬" : "🙃";
+        const frase = fraseParaRacha(FRASES_PERDIDA, currentStreak);
         const texto =
-          currentStreak >= 3
-            ? `RACHA DE ${currentStreak} FALLOS SEGUIDOS...`
-            : `${currentStreak} fallos seguidos, cuidado`;
+          currentStreak >= 2
+            ? `${currentStreak} fallos seguidos. "${frase}"`
+            : `"${frase}"`;
         achievements.push({ icon, texto, tipo: "negative" });
       }
     }
@@ -483,14 +527,14 @@
     if (maxWin >= 3) {
       achievements.push({
         icon: "🏆",
-        texto: `Récord de la temporada: ${maxWin} aciertos seguidos`,
+        texto: `Récord de la temporada: ${maxWin} aciertos seguidos. Estéticamente es una locura.`,
         tipo: "record",
       });
     }
     if (maxLose >= 3) {
       achievements.push({
         icon: "📉",
-        texto: `Peor racha de la temporada: ${maxLose} fallos seguidos`,
+        texto: `Peor racha de la temporada: ${maxLose} fallos seguidos. Para qué acertarla, pudiendo fallarla.`,
         tipo: "record",
       });
     }
