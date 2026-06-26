@@ -31,14 +31,6 @@
     statAcierto: $("#stat-acierto"),
     statAciertoSub: $("#stat-acierto-sub"),
 
-    // Balance bar
-    barLost: $("#bar-lost"),
-    barWon: $("#bar-won"),
-    barAvailable: $("#bar-available"),
-    barFillSpent: $("#bar-fill-spent"),
-    barFillWon: $("#bar-fill-won"),
-    barFillRemaining: $("#bar-fill-remaining"),
-
     // Lists
     betsList: $("#bets-list"),
     betCount: $("#bet-count"),
@@ -220,7 +212,6 @@
   function renderAll() {
     renderPlayerOfDay();
     renderStats();
-    renderBalanceBar();
     renderChart();
     renderAchievements();
     renderBets();
@@ -264,27 +255,6 @@
 
     dom.statAcierto.textContent = s.pctAcierto + "%";
     dom.statAciertoSub.textContent = `${s.totalGanadas} de ${s.totalResueltas} resueltas`;
-  }
-
-  function renderBalanceBar() {
-    const s = calcStats();
-    const netProfit = s.totalGanado - s.ganadasStakes; // beneficio neto: sin contar lo apostado
-    const total = s.boteInicial + netProfit;
-
-    // Proportions relative to total money that has "passed through"
-    const pctLost = total > 0 ? (s.totalPerdido / total) * 100 : 0;
-    const pctWon = total > 0 ? (netProfit / total) * 100 : 0;
-    const pctRemaining = Math.max(0, 100 - pctLost - pctWon);
-
-    dom.barFillSpent.style.width = pctLost + "%";
-    dom.barFillWon.style.width = pctWon + "%";
-    dom.barFillRemaining.style.width = pctRemaining + "%";
-
-    dom.barLost.textContent = formatEuroShort(s.totalPerdido);
-    dom.barWon.textContent = formatEuroShort(netProfit);
-    dom.barAvailable.textContent = formatEuroShort(
-      Math.max(0, s.dineroActual)
-    );
   }
 
   // ---- Chart: evolución del dinero ----
@@ -439,9 +409,7 @@
       "Métela tú que a mí me da la risa... y la metisteis",
     ],
     5: [
-      "Si seguís así hay que fundar una secta",
-      "Juega tú que me da la risa... de envidia",
-      "Tu delantero desfavorito ahora mismo: el que no apostó con vosotros",
+      "🏠 Road to Casa Matiki",
     ],
   };
 
@@ -533,6 +501,9 @@
       .join("");
   }
 
+  const BETS_INITIAL_VISIBLE = 5;
+  let betsExpanded = false;
+
   function renderBets() {
     const filtered =
       currentFilter === "all"
@@ -561,47 +532,63 @@
       return;
     }
 
-    // Show most recent first
+    // Las más recientes primero
     const sorted = [...filtered].reverse();
+    const visible = betsExpanded ? sorted : sorted.slice(0, BETS_INITIAL_VISIBLE);
+    const hayMas = sorted.length > BETS_INITIAL_VISIBLE;
 
-    dom.betsList.innerHTML = sorted
-      .map(
-        (bet, idx) => `
-      <div class="bet-card ${bet.estado}" data-id="${bet.id}" style="animation-delay: ${idx * 0.04}s">
-        <div class="bet-status-badge ${bet.estado}" title="${bet.estado}">
-          ${statusEmoji(bet.estado)}
-        </div>
-        <div class="bet-info">
-          <div class="bet-match">${escapeHtml(bet.partido)}</div>
-          <div class="bet-type">${escapeHtml(bet.apuesta)}</div>
-        </div>
-        <div class="bet-numbers">
-          <div class="bet-amount">${formatEuroShort(bet.importe)}</div>
-          <div class="bet-odds">× ${bet.cuota.toFixed(2)}</div>
-        </div>
-        <div class="bet-result">
-          <div class="bet-potential">${
-            bet.estado === "perdida"
-              ? "-" + formatEuroShort(bet.importe)
-              : bet.estado === "ganada"
-              ? "+" + formatEuroShort(bet.posibleGanancia - bet.importe)
-              : formatEuroShort(bet.posibleGanancia)
-          }</div>
-          <div class="bet-result-label">${
-            bet.estado === "pendiente"
-              ? "posible"
-              : bet.estado === "ganada"
-              ? "ganancia"
-              : "perdido"
-          }</div>
-        </div>
-        <div class="bet-resolve">
-          <button class="btn-resolve win${bet.estado === "ganada" ? " active" : ""}" data-row="${bet.sheetRow}" data-estado="ganada" title="Marcar como ganada">✅</button>
-          <button class="btn-resolve lose${bet.estado === "perdida" ? " active" : ""}" data-row="${bet.sheetRow}" data-estado="perdida" title="Marcar como perdida">❌</button>
-        </div>
-      </div>`
-      )
-      .join("");
+    dom.betsList.innerHTML =
+      visible
+        .map(
+          (bet, idx) => `
+        <div class="bet-card ${bet.estado}" data-id="${bet.id}" style="animation-delay: ${idx * 0.04}s">
+          <div class="bet-status-badge ${bet.estado}" title="${bet.estado}">
+            ${statusEmoji(bet.estado)}
+          </div>
+          <div class="bet-info">
+            <div class="bet-match">${escapeHtml(bet.partido)}</div>
+            <div class="bet-type">${escapeHtml(bet.apuesta)}</div>
+          </div>
+          <div class="bet-numbers">
+            <div class="bet-amount">${formatEuroShort(bet.importe)}</div>
+            <div class="bet-odds">× ${bet.cuota.toFixed(2)}</div>
+          </div>
+          <div class="bet-result">
+            <div class="bet-potential">${
+              bet.estado === "perdida"
+                ? "-" + formatEuroShort(bet.importe)
+                : bet.estado === "ganada"
+                ? "+" + formatEuroShort(bet.posibleGanancia - bet.importe)
+                : formatEuroShort(bet.posibleGanancia)
+            }</div>
+            <div class="bet-result-label">${
+              bet.estado === "pendiente"
+                ? "posible"
+                : bet.estado === "ganada"
+                ? "ganancia"
+                : "perdido"
+            }</div>
+          </div>
+          <div class="bet-resolve">
+            <button class="btn-resolve win${bet.estado === "ganada" ? " active" : ""}" data-row="${bet.sheetRow}" data-estado="ganada" title="Marcar como ganada">✅</button>
+            <button class="btn-resolve lose${bet.estado === "perdida" ? " active" : ""}" data-row="${bet.sheetRow}" data-estado="perdida" title="Marcar como perdida">❌</button>
+          </div>
+        </div>`
+        )
+        .join("") +
+      (hayMas
+        ? `<button class="btn-ver-mas" id="btn-ver-mas">
+            ${betsExpanded ? "▲ Ver menos" : `▼ Ver todas (${sorted.length - BETS_INITIAL_VISIBLE} más)`}
+          </button>`
+        : "");
+
+    const btnVerMas = document.getElementById("btn-ver-mas");
+    if (btnVerMas) {
+      btnVerMas.addEventListener("click", () => {
+        betsExpanded = !betsExpanded;
+        renderBets();
+      });
+    }
 
     const countText =
       currentFilter === "all"

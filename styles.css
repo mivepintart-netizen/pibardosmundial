@@ -530,89 +530,34 @@ body::before {
   font-weight: 400;
 }
 
-/* ---- Balance Progress Bar ---- */
-.balance-bar-container {
-  padding: 0 0 8px;
-}
-
-.balance-bar-wrapper {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 18px 22px;
-  backdrop-filter: blur(10px);
-}
-
-.balance-bar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.balance-bar-title {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.balance-bar-values {
-  display: flex;
-  gap: 16px;
-  font-size: 0.78rem;
-}
-
-.balance-bar-values span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.balance-bar-values .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.dot-spent { background: var(--red); }
-.dot-remaining { background: var(--green); }
-.dot-profit { background: var(--gold); }
-
-.balance-bar {
-  height: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-  overflow: hidden;
-  display: flex;
-}
-
-.balance-bar-fill-spent {
-  height: 100%;
-  background: linear-gradient(90deg, var(--red), #ff7e8f);
-  border-radius: 4px 0 0 4px;
-  transition: width var(--transition-slow);
-}
-
-.balance-bar-fill-won {
-  height: 100%;
-  background: linear-gradient(90deg, var(--green), #4aedc4);
-  transition: width var(--transition-slow);
-}
-
-.balance-bar-fill-remaining {
-  height: 100%;
-  background: linear-gradient(90deg, var(--blue), #7ec4ff);
-  border-radius: 0 4px 4px 0;
-  transition: width var(--transition-slow);
-}
-
 /* ---- Filters ---- */
 .filters {
   padding: 0 0 20px;
 }
+
+/* ---- Ver más ---- */
+.btn-ver-mas {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-ver-mas:hover {
+  background: var(--bg-card-hover);
+  color: var(--gold-light);
+  border-color: rgba(212, 168, 83, 0.3);
+}
+
+
 
 .filter-group {
   display: flex;
