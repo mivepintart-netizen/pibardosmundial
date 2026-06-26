@@ -97,6 +97,8 @@
   }
 
   // ---- Sincronización con Google Sheets ----
+  let firstSync = true;
+
   function bindSheetSync() {
     SheetSync.onUpdate((event, payload) => {
       if (event === "sync-start") {
@@ -107,6 +109,13 @@
         lastSyncAt = Date.now();
         dom.syncBadge.title = "Estado de sincronización con Google Sheets";
         setSyncBadge("ok", "Sincronizado ahora");
+
+        // Solo en el primer sync al abrir la app: comprueba si hay 5+ aciertos
+        if (firstSync) {
+          firstSync = false;
+          const streak = getCurrentWinStreak();
+          if (streak >= 4) launchMoneyRain();
+        }
       } else if (event === "sync-error") {
         setSyncBadge("error", "No se pudo sincronizar");
         if (payload && payload.message) {
@@ -121,6 +130,101 @@
         );
       }
     });
+  }
+
+  // Calcula cuántos aciertos seguidos hay ahora mismo (desde la más reciente)
+  function getCurrentWinStreak() {
+    const resueltas = state.apuestas.filter(
+      (a) => a.estado === "ganada" || a.estado === "perdida"
+    );
+    let streak = 0;
+    for (let i = resueltas.length - 1; i >= 0; i--) {
+      if (resueltas[i].estado === "ganada") streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  // ---- Lluvia de billetes ----
+  function launchMoneyRain() {
+    const canvas = document.createElement("canvas");
+    canvas.id = "money-rain";
+    canvas.style.cssText =
+      "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;";
+    document.body.appendChild(canvas);
+
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const DURATION = 5000;
+    const start = Date.now();
+    const bills = Array.from({ length: 38 }, () => createBill(canvas));
+
+    function createBill(canvas) {
+      return {
+        x: Math.random() * canvas.width,
+        y: -60 - Math.random() * canvas.height,
+        w: 56 + Math.random() * 24,
+        h: 26 + Math.random() * 10,
+        speed: 1.8 + Math.random() * 2.8,
+        angle: (Math.random() - 0.5) * 0.4,
+        spin: (Math.random() - 0.5) * 0.04,
+        color: ["#2d7a3a", "#3a9e4a", "#1e5c2a", "#4caf50"][Math.floor(Math.random() * 4)],
+      };
+    }
+
+    function drawBill(b) {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.angle);
+      // cuerpo del billete
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.roundRect(-b.w / 2, -b.h / 2, b.w, b.h, 3);
+      ctx.fill();
+      // borde interno
+      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(-b.w / 2 + 3, -b.h / 2 + 3, b.w - 6, b.h - 6, 2);
+      ctx.stroke();
+      // símbolo €
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = `bold ${b.h * 0.55}px Arial`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("€", 0, 0);
+      ctx.restore();
+    }
+
+    function frame() {
+      const elapsed = Date.now() - start;
+      const opacity = elapsed > DURATION - 800
+        ? Math.max(0, (DURATION - elapsed) / 800)
+        : 1;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = opacity;
+
+      bills.forEach((b) => {
+        b.y += b.speed;
+        b.angle += b.spin;
+        if (b.y > canvas.height + 60) {
+          b.y = -60;
+          b.x = Math.random() * canvas.width;
+        }
+        drawBill(b);
+      });
+
+      if (elapsed < DURATION) {
+        requestAnimationFrame(frame);
+      } else {
+        canvas.remove();
+      }
+    }
+
+    requestAnimationFrame(frame);
   }
 
   function setSyncBadge(status, text) {
