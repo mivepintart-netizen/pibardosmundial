@@ -230,7 +230,7 @@
 <!-- ======== TRAGAPERRAS POPUP ======== -->
 <div id="slots-overlay">
   <div id="slots-modal">
-    <button id="slots-skip">✕ Saltar</button>
+    <button id="slots-skip" onclick="window.closeSlots()">✕ Saltar</button>
     <div id="machine">
       <div class="slot-lights">
         <div class="slot-light"></div><div class="slot-light"></div><div class="slot-light"></div>
@@ -248,7 +248,7 @@
         <div class="slot-reel-window"><div class="slot-reel-line"></div><div class="slot-reel" id="slot-reel1"></div></div>
         <div class="slot-reel-window"><div class="slot-reel-line"></div><div class="slot-reel" id="slot-reel2"></div></div>
       </div>
-      <button id="slot-lever-btn">🎰 &nbsp; GIRAR &nbsp; 🎰</button>
+      <button id="slot-lever-btn" onclick="window.slotSpin()">🎰 &nbsp; GIRAR &nbsp; 🎰</button>
     </div>
   </div>
 </div>
